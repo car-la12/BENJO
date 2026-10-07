@@ -1,0 +1,56 @@
+@import "tailwindcss";
+@import "./App.css";
+
+:root {
+  font-family: 'DM Sans', sans-serif;
+  color: #26382c;
+  background: #e9ece4;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  --paper: #f7f6ef;
+  --ink: #26382c;
+  --muted: #738071;
+  --forest: #294b37;
+  --leaf: #718b5d;
+  --line: #e3e5dc;
+  --serif: 'DM Serif Display', Georgia, serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid #82976d;
+  outline-offset: 3px;
+}
+
+::selection {
+  color: #fff;
+  background: #718b5d;
+}
