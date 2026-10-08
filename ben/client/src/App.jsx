@@ -18,7 +18,7 @@ const products = [
   { id: 'fleur-the', name: 'Fleur de thé', type: 'INFUSION · FLEURS', description: 'Jasmin, rose et camomille', price: 2500, image: img4, steep: '4 min', temperature: '85 °C' },
   { id: 'matcha', name: 'Matcha cérémonial', type: 'THÉ VERT · JAPON', description: 'Fin, végétal et délicatement umami', price: 2500, image: img1, steep: 'Fouetter 30 s', temperature: '75 °C' },
   { id: 'sencha', name: 'Sencha du matin', type: 'THÉ VERT · JAPON', description: 'Frais et lumineux, idéal au réveil', price: 2500, image: img2, steep: '2 min', temperature: '75 °C' },
-  { id: 'rooibos', name: 'Rooibos vanillé', type: 'ROOIBOS · SANS THÉINE', description: 'Rond, doux et naturellement sucré', price: 2500, image: img3, steep: '7 min', temperature：'95 °C' },
+  { id: 'rooibos', name: 'Rooibos vanillé', type: 'ROOIBOS · SANS THÉINE', description: 'Rond, doux et naturellement sucré', price: 2500, image: img3, steep: '7 min', temperature:'95 °C' },
   { id: 'earl-grey', name: 'Earl Grey bergamote', type: 'THÉ NOIR · AGRUMES', description: 'Thé noir corsé et bergamote fraîche', price: 2500, image: img4, steep: '3 min', temperature: '90 °C' },
 ];
 
@@ -264,7 +264,7 @@ export default function App({ screen }) {
 
             <section className="hero-panel">
               <video className="hero-video" autoPlay muted loop controls>
-                <source src={heroVideoSrc} type="video/mp4" />
+                <source src={heroVideoSrc} type="video/mp4"/>
               </video>
               <div className="hero-shade" />
               <div className="hero-copy">

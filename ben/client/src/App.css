@@ -359,6 +359,7 @@
 }
 
 .hero-image,
+.hero-video,
 .ritual-card > img {
   position: absolute;
   z-index: -2;
