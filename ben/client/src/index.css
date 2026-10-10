@@ -4,19 +4,21 @@
 :root {
   font-family: 'DM Sans', sans-serif;
   color: #26382c;
-  background: #e9ece4;
+  background: #e2e4da;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-optical-sizing: auto;
   font-weight: 400;
-  --paper: #f7f6ef;
+  --paper: #efeee5;
+  --surface: #f3f1e8;
+  --surface-muted: #e9eadf;
   --ink: #26382c;
   --muted: #738071;
   --forest: #294b37;
   --leaf: #718b5d;
-  --line: #e3e5dc;
+  --line: #d9dbd0;
   --serif: 'DM Serif Display', Georgia, serif;
 }
 

@@ -8,6 +8,7 @@ import img1 from './assets/IMG_0389.PNG';
 import img2 from './assets/IMG_0390.PNG';
 import img3 from './assets/IMG_0391.PNG';
 import img4 from './assets/IMG_0392.PNG';
+import img5 from './assets/fond.png';
 
 const API_URL = 'http://localhost:5000/api/auth';
 
@@ -95,6 +96,36 @@ export function AppLayout() {
     });
   };
 
+  const addBlendToCart = ({ name, ingredientIds, servings, temperature, minutes }) => {
+    const ingredients = ingredientIds.map((id) => products.find((product) => product.id === id));
+    const recipe = {
+      name: name.trim() || 'Mon infusion personnalisée',
+      ingredientIds: [...ingredientIds].sort(),
+      servings,
+      temperature,
+      minutes,
+    };
+    const productId = `blend:${JSON.stringify(recipe)}`;
+    const customBlend = {
+      id: productId,
+      name: recipe.name,
+      type: 'INFUSION · CRÉATION PERSONNALISÉE',
+      image: ingredients[0].image,
+      price: ingredients.reduce((total, ingredient) => total + ingredient.price, 0),
+      recipe: {
+        ingredientNames: ingredients.map((ingredient) => ingredient.name),
+        ...recipe,
+      },
+    };
+
+    setCart((current) => {
+      const existing = current.find((item) => item.productId === productId);
+      return existing
+        ? current.map((item) => item.productId === productId ? { ...item, quantity: item.quantity + 1 } : item)
+        : [...current, { productId, quantity: 1, customBlend }];
+    });
+  };
+
   const updateCartQuantity = (productId, quantity) => {
     setCart((current) => quantity < 1
       ? current.filter((item) => item.productId !== productId)
@@ -168,6 +199,7 @@ export function AppLayout() {
           handleLogout,
           cart,
           addToCart,
+          addBlendToCart,
           updateCartQuantity,
           favorites,
           toggleFavorite,
@@ -178,7 +210,7 @@ export function AppLayout() {
 }
 
 export default function App({ screen }) {
-  const { isLogin, setIsLogin, user, formData, error, setError, loading, handleChange, handleSubmit, handleLogout, cart, addToCart, updateCartQuantity, favorites, toggleFavorite } = useOutletContext();
+  const { isLogin, setIsLogin, user, formData, error, setError, loading, handleChange, handleSubmit, handleLogout, cart, addToCart, addBlendToCart, updateCartQuantity, favorites, toggleFavorite } = useOutletContext();
   const [brewSeconds, setBrewSeconds] = useState(0);
   const [blendIds, setBlendIds] = useState(['sencha', 'hibiscus']);
   const [blendName, setBlendName] = useState('Mon infusion personnalisée');
@@ -188,8 +220,12 @@ export default function App({ screen }) {
   const [blendAdded, setBlendAdded] = useState(false);
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cart.reduce((total, item) => {
-    const product = products.find((entry) => entry.id === item.productId);
+    const product = item.customBlend || products.find((entry) => entry.id === item.productId);
     return total + (product ? product.price * item.quantity : 0);
+  }, 0);
+  const blendPrice = blendIds.reduce((total, id) => {
+    const product = products.find((entry) => entry.id === id);
+    return total + (product?.price || 0);
   }, 0);
 
   useEffect(() => {
@@ -212,7 +248,7 @@ export default function App({ screen }) {
           >
             <img
               className="intro-photo"
-              src="https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=1100&q=85"
+              src={img5}
               alt=""
               aria-hidden="true"
             />
@@ -514,7 +550,7 @@ export default function App({ screen }) {
             <section className="cart-content">
               <div className="cart-items">
                 {cart.map((item) => {
-                  const product = products.find((entry) => entry.id === item.productId);
+                  const product = item.customBlend || products.find((entry) => entry.id === item.productId);
                   if (!product) return null;
                   return (
                     <article className="cart-item" key={item.productId}>
@@ -522,14 +558,19 @@ export default function App({ screen }) {
                       <div className="cart-item-details">
                         <span className="tea-type">{product.type}</span>
                         <h2>{product.name}</h2>
+                        {product.recipe && (
+                          <p className="cart-recipe-details">
+                            {product.recipe.ingredientNames.join(' · ')} · {product.recipe.servings} tasse{product.recipe.servings > 1 ? 's' : ''} · {product.recipe.temperature} °C · {product.recipe.minutes} min
+                          </p>
+                        )}
                         <strong>{formatPrice(product.price * item.quantity)}</strong>
                         <div className="quantity-control" aria-label={`Quantité de ${product.name}`}>
-                          <button type="button" onClick={() => updateCartQuantity(product.id, item.quantity - 1)} aria-label={`Retirer une unité de ${product.name}`}><Minus size={14} /></button>
+                          <button type="button" onClick={() => updateCartQuantity(item.productId, item.quantity - 1)} aria-label={`Retirer une unité de ${product.name}`}><Minus size={14} /></button>
                           <span>{item.quantity}</span>
-                          <button type="button" onClick={() => updateCartQuantity(product.id, item.quantity + 1)} aria-label={`Ajouter une unité de ${product.name}`}><Plus size={14} /></button>
+                          <button type="button" onClick={() => updateCartQuantity(item.productId, item.quantity + 1)} aria-label={`Ajouter une unité de ${product.name}`}><Plus size={14} /></button>
                         </div>
                       </div>
-                      <button className="remove-button" type="button" onClick={() => updateCartQuantity(product.id, 0)} aria-label={`Supprimer ${product.name} du panier`}><Trash2 size={17} /></button>
+                      <button className="remove-button" type="button" onClick={() => updateCartQuantity(item.productId, 0)} aria-label={`Supprimer ${product.name} du panier`}><Trash2 size={17} /></button>
                     </article>
                   );
                 })}
@@ -638,15 +679,15 @@ export default function App({ screen }) {
             </section>
 
             <div className="blend-order">
-              <p>La recette vous plaît ? Ajoutez les ingrédients choisis à votre panier, ou gardez simplement votre recette sous les yeux.</p>
+              <p>Ajoutez votre infusion personnalisée au panier. Le paiement en ligne n'est pas encore configuré.</p>
               <button type="button" className="primary-button blend-order-button" disabled={!blendIds.length} onClick={() => {
-                blendIds.forEach((id) => addToCart(id));
+                addBlendToCart({ name: blendName, ingredientIds: blendIds, servings: blendServings, temperature: blendTemperature, minutes: blendMinutes });
                 setBlendAdded(true);
               }}>
-                <ShoppingBag size={16} /> Ajouter les ingrédients au panier
+                <ShoppingBag size={16} /> Ajouter mon infusion au panier · {formatPrice(blendPrice)}
               </button>
-              <span className="blend-disclaimer">Les ingrédients sont ajoutés séparément au panier. Aucun achat n'est lancé ici.</span>
-              {blendAdded && <p className="blend-added-message" role="status"><Leaf size={15} /> Les ingrédients de votre recette ont été ajoutés au panier.</p>}
+              <span className="blend-disclaimer">Tarif calculé au total des ingrédients choisis. L'ajout au panier ne valide pas un achat.</span>
+              {blendAdded && <p className="blend-added-message" role="status"><Leaf size={15} /> Votre infusion a été ajoutée au panier. <Link to="/panier">Voir mon panier <ArrowRight size={13} /></Link></p>}
             </div>
           </section>
           <BottomNav active="infusion" cartCount={cartCount} />
