@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Clock3, Coffee, Heart, Leaf, Lock, LogOut, Mail, Minus, Plus, ShoppingBag, Sprout, Trash2, User } from 'lucide-react';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { Link, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import heroVideoSrc from './assets/vid2.mp4';
 import img1 from './assets/IMG_0389.PNG';
@@ -11,6 +11,103 @@ import img4 from './assets/IMG_0392.PNG';
 import img5 from './assets/fond.png';
 
 const API_URL = 'http://localhost:5000/api/auth';
+
+// ============================================================
+//  BACKEND INTÉGRÉ (simulé dans le navigateur)
+//  Il répond aux mêmes routes que l'API :
+//    POST /api/auth/register · POST /api/auth/login · GET /api/auth/me
+//  Les comptes sont gardés dans le localStorage ("benjo_users").
+//  Mets USE_EMBEDDED_BACKEND = false pour utiliser un vrai serveur sur API_URL.
+//  ⚠️ Pour les tests uniquement : un vrai backend reste nécessaire en production.
+// ============================================================
+const USE_EMBEDDED_BACKEND = true;
+const USERS_KEY = 'benjo_users';
+
+const db = {
+  all: () => { try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; } catch { return []; } },
+  save: (users) => localStorage.setItem(USERS_KEY, JSON.stringify(users)),
+};
+
+const hashPassword = async (password, salt) => {
+  const bytes = new TextEncoder().encode(`${salt}:${password}`);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+};
+
+const makeToken = (user) => btoa(JSON.stringify({ id: user.id, exp: Date.now() + 7 * 24 * 3600 * 1000 }));
+const readToken = (token) => { try { const t = JSON.parse(atob(token)); return t.exp > Date.now() ? t : null; } catch { return null; } };
+const publicUser = ({ id, name, email }) => ({ id, name, email });
+const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+class HttpError extends Error {
+  constructor(status, message) { super(message); this.status = status; }
+}
+
+// Compte de test créé automatiquement : test@benjo.com / test1234
+const seedTestUser = async () => {
+  const users = db.all();
+  if (users.some((u) => u.email === 'test@benjo.com')) return;
+  const salt = crypto.randomUUID();
+  users.push({ id: 'test-user', name: 'Camille Test', email: 'test@benjo.com', salt, password: await hashPassword('test1234', salt) });
+  db.save(users);
+};
+
+const routes = {
+  'POST /register': async ({ body }) => {
+    const name = String(body.name || '').trim();
+    const email = String(body.email || '').trim().toLowerCase();
+    const password = String(body.password || '');
+    if (!name) throw new HttpError(400, 'Le nom est requis.');
+    if (!isEmail(email)) throw new HttpError(400, 'Adresse e-mail invalide.');
+    if (password.length < 6) throw new HttpError(400, 'Le mot de passe doit contenir au moins 6 caractères.');
+    const users = db.all();
+    if (users.some((u) => u.email === email)) throw new HttpError(409, 'Un compte existe déjà avec cette adresse e-mail.');
+    const salt = crypto.randomUUID();
+    const user = { id: crypto.randomUUID(), name, email, salt, password: await hashPassword(password, salt) };
+    db.save([...users, user]);
+    return [201, { user: publicUser(user), token: makeToken(user) }];
+  },
+  'POST /login': async ({ body }) => {
+    const email = String(body.email || '').trim().toLowerCase();
+    const password = String(body.password || '');
+    if (!email || !password) throw new HttpError(400, 'E-mail et mot de passe requis.');
+    const user = db.all().find((u) => u.email === email);
+    if (!user || user.password !== await hashPassword(password, user.salt)) throw new HttpError(401, 'E-mail ou mot de passe incorrect.');
+    return [200, { user: publicUser(user), token: makeToken(user) }];
+  },
+  'GET /me': async ({ headers }) => {
+    const token = readToken(String(headers.Authorization || '').replace('Bearer ', ''));
+    if (!token) throw new HttpError(401, 'Session expirée. Veuillez vous reconnecter.');
+    const user = db.all().find((u) => u.id === token.id);
+    if (!user) throw new HttpError(404, 'Utilisateur introuvable.');
+    return [200, { user: publicUser(user) }];
+  },
+};
+
+// Adaptateur axios : intercepte les appels vers API_URL et répond avec le "serveur" ci-dessus.
+const embeddedBackend = async (config) => {
+  await seedTestUser();
+  await new Promise((resolve) => setTimeout(resolve, 400)); // latence réseau simulée
+  const route = routes[`${config.method.toUpperCase()} ${config.url.replace(API_URL, '')}`];
+  const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : (config.data || {});
+  const respond = (status, data) => ({ data, status, statusText: String(status), headers: {}, config, request: {} });
+  try {
+    if (!route) throw new HttpError(404, 'Route introuvable.');
+    const [status, data] = await route({ body, headers: config.headers || {} });
+    return respond(status, data);
+  } catch (err) {
+    const status = err.status || 500;
+    const response = respond(status, { message: err.status ? err.message : 'Erreur serveur.' });
+    throw new AxiosError(response.data.message, AxiosError.ERR_BAD_REQUEST, config, null, response);
+  }
+};
+
+const defaultAdapter = axios.defaults.adapter;
+axios.defaults.adapter = (config) => (
+  USE_EMBEDDED_BACKEND && String(config.url).startsWith(API_URL)
+    ? embeddedBackend(config)
+    : axios.getAdapter(defaultAdapter)(config)
+);
 
 const products = [
   { id: 'hibiscus', name: 'Hibiscus', type: 'INFUSION · FLEURS', description: 'Végétal, doux et vibrant', price: 2500, image: img1, steep: '5 min', temperature: '95 °C' },
