@@ -2,57 +2,39 @@
 @import "./App.css";
 
 :root {
-  font-family: 'DM Sans', sans-serif;
-  color: #26382c;
-  background: #e2e4da;
+  --ivory: oklch(0.996140636 0.007957603 98.874792814);
+  --basil: oklch(0.407628985 0.126119817 140.420504475);
+  --gold: oklch(0.721025300 0.128349232 83.691632579);
+  --cherry: oklch(0.548158918 0.152343475 5.587303093);
+  --black: oklch(0.000000000 0.000000000 0.000000000);
+  --paper: var(--ivory);
+  --surface: var(--ivory);
+  --surface-muted: color-mix(in oklab, var(--ivory) 94%, var(--basil));
+  --ink: var(--black);
+  --muted: color-mix(in oklab, var(--black) 66%, var(--ivory));
+  --forest: var(--basil);
+  --leaf: var(--gold);
+  --line: color-mix(in oklab, var(--ivory) 80%, var(--basil));
+  --serif: 'Playfair Display', Georgia, serif;
+  --sans: 'Libre Franklin', sans-serif;
+  --primary-hover: color-mix(in oklab, var(--basil) 87%, var(--black));
+  --gold-soft: color-mix(in oklab, var(--ivory) 91%, var(--gold));
+  --cherry-soft: color-mix(in oklab, var(--ivory) 92%, var(--cherry));
+  --shadow: 0 18px 55px color-mix(in oklab, var(--black) 12%, transparent);
+  font-family: var(--sans);
+  color: var(--ink);
+  background: var(--paper);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-optical-sizing: auto;
   font-weight: 400;
-  --paper: #efeee5;
-  --surface: #f3f1e8;
-  --surface-muted: #e9eadf;
-  --ink: #26382c;
-  --muted: #738071;
-  --forest: #294b37;
-  --leaf: #718b5d;
-  --line: #d9dbd0;
-  --serif: 'DM Serif Display', Georgia, serif;
 }
-
-* {
-  box-sizing: border-box;
-}
-
-html {
-  min-width: 320px;
-  scroll-behavior: smooth;
-}
-
-body {
-  min-width: 320px;
-  min-height: 100vh;
-  margin: 0;
-}
-
-button,
-input {
-  font: inherit;
-}
-
-button {
-  -webkit-tap-highlight-color: transparent;
-}
-
-button:focus-visible,
-input:focus-visible {
-  outline: 2px solid #82976d;
-  outline-offset: 3px;
-}
-
-::selection {
-  color: #fff;
-  background: #718b5d;
-}
+* { box-sizing: border-box; }
+html { min-width: 320px; scroll-behavior: smooth; background: var(--paper); }
+body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--paper); }
+button, input, select, textarea { font: inherit; }
+button { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+::selection { color: var(--ivory); background: var(--basil); }

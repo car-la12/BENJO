@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Clock3, Coffee, Heart, Leaf, Lock, LogOut, Mail, Minus, Plus, ShoppingBag, Sprout, Trash2, User } from 'lucide-react';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { Link, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import heroVideoSrc from './assets/vid2.mp4';
 import img1 from './assets/IMG_0389.PNG';
@@ -11,103 +11,6 @@ import img4 from './assets/IMG_0392.PNG';
 import img5 from './assets/fond.png';
 
 const API_URL = 'http://localhost:5000/api/auth';
-
-// ============================================================
-//  BACKEND INTÉGRÉ (simulé dans le navigateur)
-//  Il répond aux mêmes routes que l'API :
-//    POST /api/auth/register · POST /api/auth/login · GET /api/auth/me
-//  Les comptes sont gardés dans le localStorage ("benjo_users").
-//  Mets USE_EMBEDDED_BACKEND = false pour utiliser un vrai serveur sur API_URL.
-//  ⚠️ Pour les tests uniquement : un vrai backend reste nécessaire en production.
-// ============================================================
-const USE_EMBEDDED_BACKEND = true;
-const USERS_KEY = 'benjo_users';
-
-const db = {
-  all: () => { try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; } catch { return []; } },
-  save: (users) => localStorage.setItem(USERS_KEY, JSON.stringify(users)),
-};
-
-const hashPassword = async (password, salt) => {
-  const bytes = new TextEncoder().encode(`${salt}:${password}`);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
-};
-
-const makeToken = (user) => btoa(JSON.stringify({ id: user.id, exp: Date.now() + 7 * 24 * 3600 * 1000 }));
-const readToken = (token) => { try { const t = JSON.parse(atob(token)); return t.exp > Date.now() ? t : null; } catch { return null; } };
-const publicUser = ({ id, name, email }) => ({ id, name, email });
-const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-
-class HttpError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
-}
-
-// Compte de test créé automatiquement : test@benjo.com / test1234
-const seedTestUser = async () => {
-  const users = db.all();
-  if (users.some((u) => u.email === 'test@benjo.com')) return;
-  const salt = crypto.randomUUID();
-  users.push({ id: 'test-user', name: 'Camille Test', email: 'test@benjo.com', salt, password: await hashPassword('test1234', salt) });
-  db.save(users);
-};
-
-const routes = {
-  'POST /register': async ({ body }) => {
-    const name = String(body.name || '').trim();
-    const email = String(body.email || '').trim().toLowerCase();
-    const password = String(body.password || '');
-    if (!name) throw new HttpError(400, 'Le nom est requis.');
-    if (!isEmail(email)) throw new HttpError(400, 'Adresse e-mail invalide.');
-    if (password.length < 6) throw new HttpError(400, 'Le mot de passe doit contenir au moins 6 caractères.');
-    const users = db.all();
-    if (users.some((u) => u.email === email)) throw new HttpError(409, 'Un compte existe déjà avec cette adresse e-mail.');
-    const salt = crypto.randomUUID();
-    const user = { id: crypto.randomUUID(), name, email, salt, password: await hashPassword(password, salt) };
-    db.save([...users, user]);
-    return [201, { user: publicUser(user), token: makeToken(user) }];
-  },
-  'POST /login': async ({ body }) => {
-    const email = String(body.email || '').trim().toLowerCase();
-    const password = String(body.password || '');
-    if (!email || !password) throw new HttpError(400, 'E-mail et mot de passe requis.');
-    const user = db.all().find((u) => u.email === email);
-    if (!user || user.password !== await hashPassword(password, user.salt)) throw new HttpError(401, 'E-mail ou mot de passe incorrect.');
-    return [200, { user: publicUser(user), token: makeToken(user) }];
-  },
-  'GET /me': async ({ headers }) => {
-    const token = readToken(String(headers.Authorization || '').replace('Bearer ', ''));
-    if (!token) throw new HttpError(401, 'Session expirée. Veuillez vous reconnecter.');
-    const user = db.all().find((u) => u.id === token.id);
-    if (!user) throw new HttpError(404, 'Utilisateur introuvable.');
-    return [200, { user: publicUser(user) }];
-  },
-};
-
-// Adaptateur axios : intercepte les appels vers API_URL et répond avec le "serveur" ci-dessus.
-const embeddedBackend = async (config) => {
-  await seedTestUser();
-  await new Promise((resolve) => setTimeout(resolve, 400)); // latence réseau simulée
-  const route = routes[`${config.method.toUpperCase()} ${config.url.replace(API_URL, '')}`];
-  const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : (config.data || {});
-  const respond = (status, data) => ({ data, status, statusText: String(status), headers: {}, config, request: {} });
-  try {
-    if (!route) throw new HttpError(404, 'Route introuvable.');
-    const [status, data] = await route({ body, headers: config.headers || {} });
-    return respond(status, data);
-  } catch (err) {
-    const status = err.status || 500;
-    const response = respond(status, { message: err.status ? err.message : 'Erreur serveur.' });
-    throw new AxiosError(response.data.message, AxiosError.ERR_BAD_REQUEST, config, null, response);
-  }
-};
-
-const defaultAdapter = axios.defaults.adapter;
-axios.defaults.adapter = (config) => (
-  USE_EMBEDDED_BACKEND && String(config.url).startsWith(API_URL)
-    ? embeddedBackend(config)
-    : axios.getAdapter(defaultAdapter)(config)
-);
 
 const products = [
   { id: 'hibiscus', name: 'Hibiscus', type: 'INFUSION · FLEURS', description: 'Végétal, doux et vibrant', price: 2500, image: img1, steep: '5 min', temperature: '95 °C' },
@@ -141,11 +44,11 @@ function BottomNav({ active, cartCount }) {
   );
 }
 
-function PageHeader({ title = 'BENJO' }) {
+function PageHeader({ title = 'BENDJO' }) {
   return (
     <header className="topbar">
       <Link className="icon-button" to="/accueil" aria-label="Retour à l'accueil" title="Retour"><ArrowLeft size={19} /></Link>
-      <div className="brand-lockup"><span className="brand-mark"><Sprout size={21} /></span><span><strong>{title}</strong><small>MAISON D'INFUSION</small></span></div>
+      <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">BJ</span><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span></div>
       <span className="topbar-spacer" />
     </header>
   );
@@ -168,6 +71,101 @@ function ProductRow({ product, favorite, onToggleFavorite, onAddToCart }) {
         <button className="add-button" type="button" onClick={() => onAddToCart(product.id)} aria-label={`Ajouter ${product.name} au panier`}><Plus size={17} /></button>
       </div>
     </article>
+  );
+}
+
+
+// Quiz de bienvenue BENDJO : affiché avant l'accueil tant qu'il n'a été ni complété ni passé.
+const QUIZ_STORAGE_KEY = 'bendjo_quiz_status';
+const SIGNATURE_STORAGE_KEY = 'bendjo_signature';
+const quizQuestions = [
+  { title: 'Le Moment', question: 'À quel moment de la journée avez-vous le plus besoin de votre rituel bien-être ?', options: [
+    "Au réveil, pour dynamiser mon corps et bien démarrer la journée.",
+    "En cours de journée, pour garder l'esprit clair et rester concentré(e).",
+    "L'après-midi, pour faire un break et me ressourcer.",
+    "Le soir, pour déconnecter du stress et préparer une nuit paisible.",
+  ] },
+  { title: 'La Sensation Recherchée', question: "Si vous deviez écouter votre corps aujourd'hui, de quoi a-t-il le plus besoin ?", options: [
+    "D'un coup de fouet tonique et vivifiant.",
+    "D'un vent de fraîcheur pour réveiller mon éclat et me clarifier l'esprit.",
+    "D'une respiration profonde pour me recentrer et retrouver mon équilibre.",
+    "D'une bulle de douceur cocooning pour lâcher-prise.",
+  ] },
+  { title: 'Le Profil Gustatif', question: "Côté papilles, quelle palette d'arômes vous attire le plus ?", options: [
+    'Citronnée, piquante et épicée (Gingembre, Zestes, Citronnelle).',
+    "Acidulée, fruitée et colorée (Hibiscus, Zestes, Feuille de goyavier).",
+    "Herbacée, fraîche et végétale (Menthe, Basilic, Feuille d'oranger).",
+    'Envoûtante, douce et apaisante (Passiflore, Cannelle, Corossol).',
+  ] },
+];
+const quizLetters = ['A', 'B', 'C', 'D'];
+// Correspondance profil majoritaire → produit existant de la liste.
+const quizResultProduct = { A: 'gingembre', B: 'hibiscus', C: 'fleur-the', D: 'jardin-soir' };
+
+function computeQuizResult(answers) {
+  const counts = answers.reduce((acc, letter) => ({ ...acc, [letter]: (acc[letter] || 0) + 1 }), {});
+  const max = Math.max(...Object.values(counts));
+  const tied = quizLetters.filter((letter) => counts[letter] === max);
+  // En cas d'égalité, la dernière réponse (profil gustatif) départage.
+  return tied.includes(answers[answers.length - 1]) ? answers[answers.length - 1] : tied[0];
+}
+
+function WelcomeQuiz({ onFinish }) {
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState([]);
+  const isResult = step >= quizQuestions.length;
+  const resultLetter = isResult ? computeQuizResult(answers) : null;
+  const resultProduct = resultLetter ? products.find((product) => product.id === quizResultProduct[resultLetter]) : null;
+
+  const choose = (letter) => {
+    const next = [...answers.slice(0, step), letter];
+    setAnswers(next);
+    setStep(step + 1);
+  };
+
+  return (
+    <motion.main key="quiz" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} className="app-shell quiz-screen">
+      <header className="quiz-header">
+        <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">BJ</span><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span></div>
+        <button className="quiz-skip" type="button" onClick={() => onFinish(null)}>Passer et accéder directement à la boutique <ArrowRight size={14} /></button>
+      </header>
+
+      {!isResult ? (
+        <section className="quiz-body" aria-live="polite">
+          {step === 0 && (
+            <div className="quiz-intro">
+              <span className="eyebrow">ONBOARDING SOMMELIER</span>
+              <h1>Trouvez votre infusion signature BENDJO</h1>
+              <p>Répondez à 3 questions rapides pour découvrir l'assemblage personnalisé qui répondra aux besoins de votre corps et de votre esprit.</p>
+            </div>
+          )}
+          <div className="quiz-progress" aria-label={`Question ${step + 1} sur ${quizQuestions.length}`}>
+            {quizQuestions.map((_, index) => <span key={index} className={index <= step ? 'is-active' : ''} />)}
+          </div>
+          <span className="quiz-step">Question {step + 1} · {quizQuestions[step].title}</span>
+          <h2 className="quiz-question">{quizQuestions[step].question}</h2>
+          <div className="quiz-options">
+            {quizQuestions[step].options.map((label, index) => (
+              <button key={label} type="button" className={`quiz-option${answers[step] === quizLetters[index] ? ' is-selected' : ''}`} onClick={() => choose(quizLetters[index])}>
+                <span className="quiz-letter">{quizLetters[index]}</span><span>{label}</span>
+              </button>
+            ))}
+          </div>
+          {step > 0 && <button className="quiz-back" type="button" onClick={() => setStep(step - 1)}><ArrowLeft size={14} /> Question précédente</button>}
+        </section>
+      ) : (
+        <section className="quiz-body quiz-result">
+          <span className="eyebrow">VOTRE INFUSION SIGNATURE</span>
+          <div className="quiz-result-image"><img src={resultProduct.image} alt={`Infusion ${resultProduct.name}`} /></div>
+          <span className="tea-type">{resultProduct.type}</span>
+          <h1>{resultProduct.name}</h1>
+          <p>{resultProduct.description}</p>
+          <p className="quiz-result-ritual"><Clock3 size={14} /> {resultProduct.steep} · {resultProduct.temperature}</p>
+          <button className="primary-button" type="button" onClick={() => onFinish(resultProduct.id)}>Découvrir mon infusion signature <ArrowRight size={16} /></button>
+          <button className="quiz-back" type="button" onClick={() => { setAnswers([]); setStep(0); }}>Recommencer le quiz</button>
+        </section>
+      )}
+    </motion.main>
   );
 }
 
@@ -315,6 +313,18 @@ export default function App({ screen }) {
   const [blendTemperature, setBlendTemperature] = useState(85);
   const [blendMinutes, setBlendMinutes] = useState(4);
   const [blendAdded, setBlendAdded] = useState(false);
+  const [quizStatus, setQuizStatus] = useState(() => (typeof window !== 'undefined' ? window.localStorage.getItem(QUIZ_STORAGE_KEY) : null));
+  const [signatureId, setSignatureId] = useState(() => (typeof window !== 'undefined' ? window.localStorage.getItem(SIGNATURE_STORAGE_KEY) : null));
+  const signatureProduct = products.find((product) => product.id === signatureId);
+  const finishQuiz = (productId) => {
+    window.localStorage.setItem(QUIZ_STORAGE_KEY, productId ? 'completed' : 'skipped');
+    if (productId) {
+      window.localStorage.setItem(SIGNATURE_STORAGE_KEY, productId);
+      setSignatureId(productId);
+    }
+    setQuizStatus(productId ? 'completed' : 'skipped');
+    if (productId) window.setTimeout(() => document.getElementById('signature')?.scrollIntoView({ behavior: 'smooth' }), 500);
+  };
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cart.reduce((total, item) => {
     const product = item.customBlend || products.find((entry) => entry.id === item.productId);
@@ -351,7 +361,7 @@ export default function App({ screen }) {
             />
             <div className="intro-overlay" />
             <header className="intro-topbar">
-              <div className="intro-brand"><Sprout size={21} /><span><strong>BENJO</strong><small>MAISON DE THÉ</small></span></div>
+              <div className="intro-brand"><span className="brand-mark" aria-hidden="true">BJ</span><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span></div>
               <Link className="intro-skip" to="/accueil">Passer <ArrowRight size={14} /></Link>
             </header>
 
@@ -368,15 +378,17 @@ export default function App({ screen }) {
 
             <section className="intro-copy">
               <span className="intro-eyebrow"><Leaf size={13} /> LE TEMPS DE L'INFUSION</span>
-              <h1>Tout commence<br />par une feuille.</h1>
+              <h1>Tout commence<br />par une feuille.</h1><p className="banner-tagline">La sérénité a un goût</p>
               <p>Choisissez votre infusion. Laissez le temps faire le reste.</p>
-              <Link className="intro-enter" to="/accueil">Découvrir B3NJO <ArrowRight size={16} /></Link>
+              <Link className="intro-enter" to="/accueil">Découvrir BENDJO <ArrowRight size={16} /></Link>
             </section>
             <div className="intro-progress" />
           </motion.main>
       )}
 
-      {screen === 'accueil' && (
+      {screen === 'accueil' && !quizStatus && <WelcomeQuiz onFinish={finishQuiz} />}
+
+      {screen === 'accueil' && quizStatus && (
           <motion.div
             key="splash"
             initial={{ opacity: 0, y: 12 }}
@@ -387,8 +399,8 @@ export default function App({ screen }) {
           >
             <header className="topbar">
               <div className="brand-lockup">
-                <span className="brand-mark"><Sprout size={21} strokeWidth={1.8} /></span>
-                <span><strong>BENJO</strong><small>MAISON D'INFUSION</small></span>
+                <span className="brand-mark" aria-hidden="true">BJ</span>
+                <span><strong>BENDJO</strong><small>La sérénité a un goût</small></span>
               </div>
               <Link className="icon-button" to="/auth" aria-label="Se connecter" title="Se connecter">
                 <User size={19} />
@@ -402,7 +414,7 @@ export default function App({ screen }) {
               <div className="hero-shade" />
               <div className="hero-copy">
                 <span className="eyebrow light-eyebrow"><Leaf size={13} /> CUEILLI AVEC SOIN</span>
-                <h1>L'infusion, à<br />votre rythme.</h1>
+                <h1>L'infusion, à<br />votre rythme.</h1><p className="banner-tagline">La sérénité a un goût</p>
                 <p>Des feuilles choisies à la main. Des instants qui n'appartiennent qu'à vous.</p>
                 <button className="button-light" onClick={() => document.getElementById('selection')?.scrollIntoView({ behavior: 'smooth' })}>
                   Explorer les infusions <ArrowRight size={16} />
@@ -411,9 +423,18 @@ export default function App({ screen }) {
               <span className="image-credit">UN MOMENT POUR SOI</span>
             </section>
 
+            {signatureProduct && (
+              <section className="collection-section signature-section" id="signature">
+                <div className="section-heading"><div><span className="eyebrow">VOTRE INFUSION SIGNATURE</span><h2>Choisie pour vous</h2></div></div>
+                <div className="tea-list signature-highlight">
+                  <ProductRow product={signatureProduct} favorite={favorites.includes(signatureProduct.id)} onToggleFavorite={toggleFavorite} onAddToCart={addToCart} />
+                </div>
+              </section>
+            )}
+
             <section className="collection-section" id="selection">
               <div className="section-heading">
-                <div><span className="eyebrow">LA SÉLECTION BENJO</span><h2>Vos prochains favoris</h2></div>
+                <div><span className="eyebrow">LA SÉLECTION BENDJO</span><h2>Vos prochains favoris</h2></div>
                 <Link className="text-button" to="/collection">Tout voir <ArrowRight size={14} /></Link>
               </div>
               <div className="tea-list">
@@ -438,12 +459,12 @@ export default function App({ screen }) {
           >
             <header className="topbar">
               <Link className="icon-button" to="/accueil" aria-label="Retour à l'accueil" title="Retour"><ArrowLeft size={19} /></Link>
-              <div className="brand-lockup"><span className="brand-mark"><Sprout size={21} /></span><span><strong>AUBE</strong><small>MAISON DE THÉ</small></span></div>
+              <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">BJ</span><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span></div>
               <span className="topbar-spacer" />
             </header>
             <div className="auth-content">
               <span className="eyebrow">VOTRE PAUSE COMMENCE ICI</span>
-              <h1>{isLogin ? 'Ravi de vous retrouver.' : 'Bienvenue chez BENJO.'}</h1>
+              <h1>{isLogin ? 'Ravi de vous retrouver.' : 'Bienvenue chez BENDJO.'}</h1>
               <p className="auth-intro">{isLogin ? 'Connectez-vous pour retrouver vos infusions et vos rituels.' : 'Créez votre compte et composez votre premier rituel.'}</p>
             </div>
 
@@ -508,7 +529,7 @@ export default function App({ screen }) {
             </form>
 
             <div className="auth-switch">
-              <span>{isLogin ? 'Nouveau chez DENJO ?' : 'Vous avez déjà un compte ?'}</span>
+              <span>{isLogin ? 'Nouveau chez BENDJO ?' : 'Vous avez déjà un compte ?'}</span>
               <button
                 onClick={() => { setIsLogin(!isLogin); setError(''); }}
               >
@@ -557,7 +578,7 @@ export default function App({ screen }) {
             className="app-shell member-screen"
           >
             <header className="topbar">
-              <div className="brand-lockup"><span className="brand-mark"><Sprout size={21} /></span><span><strong>AUBE</strong><small>MAISON DE THÉ</small></span></div>
+              <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">BJ</span><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span></div>
               <button onClick={handleLogout} className="icon-button" aria-label="Se déconnecter" title="Se déconnecter"><LogOut size={18} /></button>
             </header>
             <section className="member-welcome">
@@ -572,7 +593,7 @@ export default function App({ screen }) {
             </section>
             <section className="member-bottom">
               <div className="section-heading"><div><span className="eyebrow">À REDÉCOUVRIR</span><h2>Vos thés préférés</h2></div><Link className="text-button" to="/accueil">La collection <ArrowRight size={14} /></Link></div>
-              <div className="member-tip"><Leaf size={20} /><p><strong>Le petit conseil d'Aube</strong><br />Réinfusez vos feuilles une seconde fois : les arômes changent, la surprise reste.</p></div>
+              <div className="member-tip"><Leaf size={20} /><p><strong>Le petit conseil d'BENDJO</strong><br />Réinfusez vos feuilles une seconde fois : les arômes changent, la surprise reste.</p></div>
             </section>
             <BottomNav active="accueil" cartCount={cartCount} />
           </motion.div>
