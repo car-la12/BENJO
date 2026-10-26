@@ -2,13 +2,19 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Clock3, Coffee, Heart, Leaf, Lock, LogOut, Mail, Minus, Plus, ShoppingBag, Sprout, Trash2, User } from 'lucide-react';
 import axios from 'axios';
-import { Link, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import heroVideoSrc from './assets/vid2.mp4';
 import img1 from './assets/IMG_0389.PNG';
 import img2 from './assets/IMG_0390.PNG';
 import img3 from './assets/IMG_0391.PNG';
 import img4 from './assets/IMG_0392.PNG';
 import img5 from './assets/fond.png';
+import logo from './assets/logo.png';
+import gingem from './assets/photo.jpg';
+import hibis from './assets/hibiscus.jpg';
+import goyave from './assets/goyave.jpg';
+import zeste from './assets/zeste.jpg';
+import basilic from './assets/basilic.jpg';
 
 const API_URL = 'http://localhost:5000/api/auth';
 
@@ -21,6 +27,58 @@ const products = [
   { id: 'sencha', name: 'Sencha du matin', type: 'THÉ VERT · JAPON', description: 'Frais et lumineux, idéal au réveil', price: 2500, image: img2, steep: '2 min', temperature: '75 °C' },
   { id: 'rooibos', name: 'Rooibos vanillé', type: 'ROOIBOS · SANS THÉINE', description: 'Rond, doux et naturellement sucré', price: 2500, image: img3, steep: '7 min', temperature:'95 °C' },
   { id: 'earl-grey', name: 'Earl Grey bergamote', type: 'THÉ NOIR · AGRUMES', description: 'Thé noir corsé et bergamote fraîche', price: 2500, image: img4, steep: '3 min', temperature: '90 °C' },
+];
+
+const flavorCategories = [
+  {
+    id: 'energisants',
+    name: 'Les Énergisants & Stimulants',
+    timing: 'Matin / Début de journée',
+    description: 'Pour réveiller le corps, stimuler l’esprit et démarrer sur une note dynamique.',
+    image: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=1000&q=85',
+    blends: [
+      { id: 'eveil', name: 'ÉVEIL', ingredients: 'Gingembre, citronnelle, zestes de citron', image: gingem },
+      { id: 'elan', name: 'ÉLAN', ingredients: 'Moringa, basilic, menthe', image: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=900&q=80' },
+      { id: 'rose', name: 'Rosé', ingredients: 'Moringa, gingembre, hibiscus, zeste de citron', image: hibis },
+    ],
+  },
+  {
+    id: 'vitalisants',
+    name: 'Les Vitalisants & Clarifiants',
+    timing: 'En journée / Concentration',
+    description: 'Pour soutenir la productivité, rafraîchir l’esprit et apporter de la légèreté.',
+    image: 'https://images.unsplash.com/photo-1497250681960-ef046c08a56e?auto=format&fit=crop&w=1000&q=85',
+    blends: [
+      { id: 'clarte', name: 'CLARTÉ', ingredients: 'Citronnelle, feuilles de goyavier, zestes de citron', image: zeste },
+      { id: 'eclat', name: 'ÉCLAT', ingredients: 'Hibiscus, menthe, feuilles d’oranger, zestes de citron', image: hibis },
+      { id: 'epure', name: 'Épure', ingredients: 'Feuille de goyavier, citronnelle, menthe', image: goyave },
+    ],
+  },
+  {
+    id: 'harmonisants',
+    name: 'Les Harmonisants & Rééquilibrants',
+    timing: 'Pauses / Après-midi',
+    description: 'Pour faire une pause régénérante, se recentrer ou favoriser une digestion douce.',
+    image: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&w=1000&q=85',
+    blends: [
+      { id: 'pause', name: 'PAUSE', ingredients: 'Feuilles de goyavier, citronnelle, basilic, menthe', image: 'https://images.unsplash.com/photo-1556881286-fc6915169721?auto=format&fit=crop&w=900&q=80' },
+      { id: 'souffle', name: 'SOUFFLE', ingredients: 'Hibiscus, feuilles d’oranger, menthe', image: 'https://images.unsplash.com/photo-1571934811356-5cc061b6821f?auto=format&fit=crop&w=900&q=80' },
+      { id: 'retrouver', name: 'RETROUVER', ingredients: 'Basilic, feuilles d’oranger, cannelle, menthe', image: basilic },
+    ],
+  },
+  {
+    id: 'relaxants',
+    name: 'Les Relaxants & Nocturnes',
+    timing: 'Soir & Nuit',
+    description: 'Pour décompresser, relâcher les tensions et favoriser un sommeil réparateur.',
+    image: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1000&q=85',
+    blends: [
+      { id: 'decompresser', name: 'DÉCOMPRESSER', ingredients: 'Citronnelle, feuilles d’oranger, cannelle, passiflore', image: 'https://images.unsplash.com/photo-1597318181409-cf64d0b5d8a2?auto=format&fit=crop&w=900&q=80' },
+      { id: 'apaise', name: 'APAISE', ingredients: 'Passiflore, feuilles d’oranger, citronnelle', image: 'https://images.unsplash.com/photo-1530968464165-7a1861cbaf9f?auto=format&fit=crop&w=900&q=80' },
+      { id: 'nuit', name: 'NUIT', ingredients: 'Passiflore, feuilles d’oranger, cannelle, corossol', image: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=900&q=80' },
+      { id: 'eclipse', name: 'Éclipse', ingredients: 'Feuille de corossol, feuille d’oranger, citronnelle', image: 'https://images.unsplash.com/photo-1497250681960-ef046c08a56e?auto=format&fit=crop&w=900&q=80' },
+    ],
+  },
 ];
 
 const formatPrice = (amount) => `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(amount)} FCFA`;
@@ -46,9 +104,9 @@ function BottomNav({ active, cartCount }) {
 
 function PageHeader({ title = 'BENDJO' }) {
   return (
-    <header className="topbar">
+    <header className="topbar" aria-label={title}>
       <Link className="icon-button" to="/accueil" aria-label="Retour à l'accueil" title="Retour"><ArrowLeft size={19} /></Link>
-      <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">BJ</span><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span></div>
+      <img src={logo} alt="BENJO" /><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span>
       <span className="topbar-spacer" />
     </header>
   );
@@ -72,6 +130,18 @@ function ProductRow({ product, favorite, onToggleFavorite, onAddToCart }) {
       </div>
     </article>
   );
+}
+
+function FlavorCategoryCards({ categories }) {
+  return categories.map((category) => (
+    <Link key={category.id} className="flavor-category-card" to={`/categories/${category.id}`}>
+      <img src={category.image} alt="" />
+      <span className="eyebrow">{category.timing}</span>
+      <strong>{category.name}</strong>
+      <span>{category.description}</span>
+      <span className="flavor-category-link">Voir les infusions <ArrowRight size={15} /></span>
+    </Link>
+  ));
 }
 
 
@@ -126,7 +196,7 @@ function WelcomeQuiz({ onFinish }) {
   return (
     <motion.main key="quiz" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} className="app-shell quiz-screen">
       <header className="quiz-header">
-        <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">BJ</span><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span></div>
+        <div className="brand-lockup"><img src={logo} alt="BENDJO" className="brand-mark" /><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span></div>
         <button className="quiz-skip" type="button" onClick={() => onFinish(null)}>Passer et accéder directement à la boutique <ArrowRight size={14} /></button>
       </header>
 
@@ -221,6 +291,25 @@ export function AppLayout() {
     });
   };
 
+  const addCategoryBlendToCart = (category, blend) => {
+    const productId = `category:${category.id}:${blend.id}`;
+    const customBlend = {
+      id: productId,
+      name: blend.name,
+      type: category.name,
+      image: blend.image,
+      price: 2500,
+      ingredients: blend.ingredients,
+    };
+
+    setCart((current) => {
+      const existing = current.find((item) => item.productId === productId);
+      return existing
+        ? current.map((item) => item.productId === productId ? { ...item, quantity: item.quantity + 1 } : item)
+        : [...current, { productId, quantity: 1, customBlend }];
+    });
+  };
+
   const updateCartQuantity = (productId, quantity) => {
     setCart((current) => quantity < 1
       ? current.filter((item) => item.productId !== productId)
@@ -295,6 +384,7 @@ export function AppLayout() {
           cart,
           addToCart,
           addBlendToCart,
+          addCategoryBlendToCart,
           updateCartQuantity,
           favorites,
           toggleFavorite,
@@ -305,7 +395,8 @@ export function AppLayout() {
 }
 
 export default function App({ screen }) {
-  const { isLogin, setIsLogin, user, formData, error, setError, loading, handleChange, handleSubmit, handleLogout, cart, addToCart, addBlendToCart, updateCartQuantity, favorites, toggleFavorite } = useOutletContext();
+  const { isLogin, setIsLogin, user, formData, error, setError, loading, handleChange, handleSubmit, handleLogout, cart, addToCart, addBlendToCart, addCategoryBlendToCart, updateCartQuantity, favorites, toggleFavorite } = useOutletContext();
+  const { categoryId } = useParams();
   const [brewSeconds, setBrewSeconds] = useState(0);
   const [blendIds, setBlendIds] = useState(['sencha', 'hibiscus']);
   const [blendName, setBlendName] = useState('Mon infusion personnalisée');
@@ -314,16 +405,14 @@ export default function App({ screen }) {
   const [blendMinutes, setBlendMinutes] = useState(4);
   const [blendAdded, setBlendAdded] = useState(false);
   const [quizStatus, setQuizStatus] = useState(() => (typeof window !== 'undefined' ? window.localStorage.getItem(QUIZ_STORAGE_KEY) : null));
-  const [signatureId, setSignatureId] = useState(() => (typeof window !== 'undefined' ? window.localStorage.getItem(SIGNATURE_STORAGE_KEY) : null));
-  const signatureProduct = products.find((product) => product.id === signatureId);
+  const flavorCategory = flavorCategories.find((category) => category.id === categoryId);
   const finishQuiz = (productId) => {
     window.localStorage.setItem(QUIZ_STORAGE_KEY, productId ? 'completed' : 'skipped');
     if (productId) {
       window.localStorage.setItem(SIGNATURE_STORAGE_KEY, productId);
-      setSignatureId(productId);
     }
     setQuizStatus(productId ? 'completed' : 'skipped');
-    if (productId) window.setTimeout(() => document.getElementById('signature')?.scrollIntoView({ behavior: 'smooth' }), 500);
+    if (productId) window.setTimeout(() => document.getElementById('selection')?.scrollIntoView({ behavior: 'smooth' }), 500);
   };
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cart.reduce((total, item) => {
@@ -361,7 +450,7 @@ export default function App({ screen }) {
             />
             <div className="intro-overlay" />
             <header className="intro-topbar">
-              <div className="intro-brand"><span className="brand-mark" aria-hidden="true">BJ</span><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span></div>
+              <div className="intro-brand"><img src={logo} alt="BENDJO" className="brand-mark" /><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span></div>
               <Link className="intro-skip" to="/accueil">Passer <ArrowRight size={14} /></Link>
             </header>
 
@@ -399,7 +488,7 @@ export default function App({ screen }) {
           >
             <header className="topbar">
               <div className="brand-lockup">
-                <span className="brand-mark" aria-hidden="true">BJ</span>
+                <img src={logo} alt="BENDJO" className="brand-mark" />
                 <span><strong>BENDJO</strong><small>La sérénité a un goût</small></span>
               </div>
               <Link className="icon-button" to="/auth" aria-label="Se connecter" title="Se connecter">
@@ -417,31 +506,20 @@ export default function App({ screen }) {
                 <h1>L'infusion, à<br />votre rythme.</h1><p className="banner-tagline">La sérénité a un goût</p>
                 <p>Des feuilles choisies à la main. Des instants qui n'appartiennent qu'à vous.</p>
                 <button className="button-light" onClick={() => document.getElementById('selection')?.scrollIntoView({ behavior: 'smooth' })}>
-                  Explorer les infusions <ArrowRight size={16} />
+                  Explorer les catégories <ArrowRight size={16} />
                 </button>
               </div>
               <span className="image-credit">UN MOMENT POUR SOI</span>
             </section>
 
-            {signatureProduct && (
-              <section className="collection-section signature-section" id="signature">
-                <div className="section-heading"><div><span className="eyebrow">VOTRE INFUSION SIGNATURE</span><h2>Choisie pour vous</h2></div></div>
-                <div className="tea-list signature-highlight">
-                  <ProductRow product={signatureProduct} favorite={favorites.includes(signatureProduct.id)} onToggleFavorite={toggleFavorite} onAddToCart={addToCart} />
-                </div>
-              </section>
-            )}
-
-            <section className="collection-section" id="selection">
+            <section className="collection-section flavor-categories-section" id="selection">
               <div className="section-heading">
-                <div><span className="eyebrow">LA SÉLECTION BENDJO</span><h2>Vos prochains favoris</h2></div>
-                <Link className="text-button" to="/collection">Tout voir <ArrowRight size={14} /></Link>
+                <div><span className="eyebrow">CATÉGORIES DES SAVEURS</span><h2>Nos infusions par envie</h2></div>
               </div>
-              <div className="tea-list">
-                {products.slice(0, 4).map((product) => (
-                  <ProductRow key={product.id} product={product} favorite={favorites.includes(product.id)} onToggleFavorite={toggleFavorite} onAddToCart={addToCart} />
-                ))}
+              <div className="flavor-category-list">
+                <FlavorCategoryCards categories={[flavorCategories[0]]} />
               </div>
+              <Link className="other-categories-button" to="/categories">Autres <ArrowRight size={16} /></Link>
             </section>
 
             <BottomNav active="accueil" cartCount={cartCount} />
@@ -459,7 +537,7 @@ export default function App({ screen }) {
           >
             <header className="topbar">
               <Link className="icon-button" to="/accueil" aria-label="Retour à l'accueil" title="Retour"><ArrowLeft size={19} /></Link>
-              <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">BJ</span><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span></div>
+              <div className="brand-lockup"><img src={logo} alt="BENDJO" className="brand-mark" /><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span></div>
               <span className="topbar-spacer" />
             </header>
             <div className="auth-content">
@@ -618,6 +696,64 @@ export default function App({ screen }) {
         </motion.div>
       )}
 
+      {screen === 'category' && (
+        <motion.div key="category" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="app-shell member-screen">
+          <PageHeader title={flavorCategory?.name || 'CATÉGORIES'} />
+          {flavorCategory ? (
+            <>
+              <section className="page-intro">
+                <span className="eyebrow">{flavorCategory.timing}</span>
+                <h1>{flavorCategory.name}</h1>
+                <p>{flavorCategory.description}</p>
+              </section>
+              <img className="flavor-category-hero-image" src={flavorCategory.image} alt={`Illustration naturelle : ${flavorCategory.name}`} />
+              <section className="collection-section flavor-blends-section">
+                <div className="flavor-blend-list">
+                  {flavorCategory.blends.map((blend) => (
+                    <article className="flavor-blend-card" key={blend.name}>
+                      <img src={blend.image} alt={`Illustration naturelle de l’infusion ${blend.name}`} />
+                      <div className="flavor-blend-copy">
+                        <span className="eyebrow">INFUSION</span>
+                        <h2>{blend.name}</h2>
+                        <p>{blend.ingredients}</p>
+                        <strong className="product-price">{formatPrice(2500)}</strong>
+                        <button className="add-blend-button" type="button" onClick={() => addCategoryBlendToCart(flavorCategory, blend)}>
+                          <ShoppingBag size={16} /> Ajouter au panier
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </>
+          ) : (
+            <section className="page-intro">
+              <span className="eyebrow">CATÉGORIE INTROUVABLE</span>
+              <h1>Cette catégorie n’existe pas.</h1>
+              <Link className="text-button" to="/accueil">Retour aux catégories <ArrowRight size={14} /></Link>
+            </section>
+          )}
+          <BottomNav active="accueil" cartCount={cartCount} />
+        </motion.div>
+      )}
+
+      {screen === 'categories' && (
+        <motion.div key="categories" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="app-shell member-screen">
+          <PageHeader title="CATÉGORIES DES SAVEURS" />
+          <section className="page-intro">
+            <span className="eyebrow">CATÉGORIES DES SAVEURS</span>
+            <h1>Toutes nos catégories</h1>
+            <p>Choisissez le moment ou l’envie qui vous ressemble.</p>
+          </section>
+          <section className="collection-section flavor-categories-section">
+            <div className="flavor-category-list">
+              <FlavorCategoryCards categories={flavorCategories} />
+            </div>
+          </section>
+          <BottomNav active="accueil" cartCount={cartCount} />
+        </motion.div>
+      )}
+
       {screen === 'rituel' && (
         <motion.div key="rituel" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="app-shell member-screen">
           <PageHeader title="MON RITUEL" />
@@ -681,6 +817,7 @@ export default function App({ screen }) {
                             {product.recipe.ingredientNames.join(' · ')} · {product.recipe.servings} tasse{product.recipe.servings > 1 ? 's' : ''} · {product.recipe.temperature} °C · {product.recipe.minutes} min
                           </p>
                         )}
+                        {product.ingredients && <p className="cart-recipe-details">{product.ingredients}</p>}
                         <strong>{formatPrice(product.price * item.quantity)}</strong>
                         <div className="quantity-control" aria-label={`Quantité de ${product.name}`}>
                           <button type="button" onClick={() => updateCartQuantity(item.productId, item.quantity - 1)} aria-label={`Retirer une unité de ${product.name}`}><Minus size={14} /></button>

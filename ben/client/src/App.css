@@ -320,13 +320,10 @@
 }
 
 .brand-mark {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border: 1px solid var(--basil);
-  border-radius: 50%;
-  color: var(--forest);
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  flex: 0 0 50px;
 }
 
 .icon-button,
@@ -1658,3 +1655,155 @@
 .quiz-result-ritual { display: inline-flex; gap: 6px; align-items: center; color: var(--cherry) !important; font-size: 0.85rem; }
 .quiz-result .primary-button { margin-top: 10px; }
 .signature-highlight .tea-item { border: 1px solid var(--gold); border-radius: 18px; background: var(--gold-soft); }
+
+.flavor-category-list,
+.flavor-blend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.flavor-category-card,
+.flavor-blend-card {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.flavor-category-card {
+  overflow: hidden;
+  padding: 0 0 18px;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.flavor-category-card > .eyebrow,
+.flavor-category-card > strong,
+.flavor-category-card > span:not(.flavor-category-link) {
+  margin-right: 18px;
+  margin-left: 18px;
+}
+
+.flavor-category-card > img {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+}
+
+.flavor-category-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold);
+}
+
+.flavor-category-card > strong {
+  color: var(--basil);
+  font-family: var(--serif);
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.flavor-category-card > span:not(.eyebrow),
+.flavor-blend-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.flavor-category-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  color: var(--basil) !important;
+  font-weight: 600;
+}
+
+.flavor-blend-card {
+  overflow: hidden;
+  border-left: 3px solid var(--gold);
+  padding: 0;
+}
+
+.flavor-blend-card > img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+}
+
+.flavor-blend-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 16px 18px 18px;
+}
+
+.flavor-blend-card h2 {
+  margin: 0;
+  color: var(--basil);
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.add-blend-button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--basil);
+  color: var(--ivory);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.add-blend-button:hover {
+  transform: translateY(-1px);
+  background: var(--primary-hover);
+}
+
+.other-categories-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 0 20px;
+  border: 1px solid var(--basil);
+  border-radius: 999px;
+  color: var(--basil);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s, background 0.2s;
+}
+
+.other-categories-button:hover {
+  background: var(--basil);
+  color: var(--ivory);
+}
+
+.flavor-category-hero-image {
+  display: block;
+  width: calc(100% - 28px);
+  height: 190px;
+  margin: 0 14px;
+  border-radius: 16px;
+  object-fit: cover;
+}
