@@ -15,6 +15,7 @@ const router = createBrowserRouter([
       { path: 'accueil', element: <App screen="accueil" /> },
       { path: 'auth', element: <App screen="auth" /> },
       { path: 'transition', element: <App screen="transition" /> },
+      { path: 'questionnaire', element: <App screen="questionnaire" /> },
       { path: 'dashboard', element: <App screen="dashboard" /> },
       { path: 'collection', element: <App screen="collection" /> },
       { path: 'categories', element: <App screen="categories" /> },

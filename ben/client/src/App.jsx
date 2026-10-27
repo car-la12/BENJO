@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Clock3, Coffee, Heart, Leaf, Lock, LogOut, Mail, Minus, Plus, ShoppingBag, Sprout, Trash2, User } from 'lucide-react';
-import axios from 'axios';
-import { Link, Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import { Link, Navigate, Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import heroVideoSrc from './assets/vid2.mp4';
 import img1 from './assets/IMG_0389.PNG';
 import img2 from './assets/IMG_0390.PNG';
@@ -16,7 +15,40 @@ import goyave from './assets/goyave.jpg';
 import zeste from './assets/zeste.jpg';
 import basilic from './assets/basilic.jpg';
 
-const API_URL = 'http://localhost:5000/api/auth';
+const AUTH_USERS_STORAGE_KEY = 'bendjo_test_users';
+
+function getStoredUsers() {
+  const storedUsers = window.localStorage.getItem(AUTH_USERS_STORAGE_KEY);
+  if (!storedUsers) return [];
+
+  const users = JSON.parse(storedUsers);
+  if (!Array.isArray(users)) {
+    throw new Error('Les comptes de test enregistrés dans ce navigateur sont invalides.');
+  }
+  return users;
+}
+
+function getStoredUser() {
+  const userId = window.localStorage.getItem('token');
+  if (!userId) return null;
+
+  const user = getStoredUsers().find((storedUser) => storedUser.id === userId);
+  return user ? { id: user.id, name: user.name, email: user.email } : null;
+}
+
+function createSalt() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashPassword(password, salt) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: new TextEncoder().encode(salt), iterations: 120000, hash: 'SHA-256' },
+    key,
+    256,
+  );
+  return Array.from(new Uint8Array(bits), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 const products = [
   { id: 'hibiscus', name: 'Hibiscus', type: 'INFUSION · FLEURS', description: 'Végétal, doux et vibrant', price: 2500, image: img1, steep: '5 min', temperature: '95 °C' },
@@ -102,11 +134,14 @@ function BottomNav({ active, cartCount }) {
   );
 }
 
-function PageHeader({ title = 'BENDJO' }) {
+function PageHeader({ title = 'BENDJO', className = '' }) {
   return (
-    <header className="topbar" aria-label={title}>
+    <header className={`topbar ${className}`.trim()} aria-label={title}>
       <Link className="icon-button" to="/accueil" aria-label="Retour à l'accueil" title="Retour"><ArrowLeft size={19} /></Link>
-      <img src={logo} alt="BENJO" /><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span>
+      <div className="page-header-brand">
+        <img className="page-header-logo" src={logo} alt="BENDJO" />
+        <span><strong>BENDJO</strong><small>La sérénité a un goût</small></span>
+      </div>
       <span className="topbar-spacer" />
     </header>
   );
@@ -145,9 +180,10 @@ function FlavorCategoryCards({ categories }) {
 }
 
 
-// Quiz de bienvenue BENDJO : affiché avant l'accueil tant qu'il n'a été ni complété ni passé.
+// Quiz de bienvenue BENDJO : affiché une fois après la première connexion de chaque compte.
 const QUIZ_STORAGE_KEY = 'bendjo_quiz_status';
 const SIGNATURE_STORAGE_KEY = 'bendjo_signature';
+const getQuizStorageKey = (userId) => `${QUIZ_STORAGE_KEY}_${userId}`;
 const quizQuestions = [
   { title: 'Le Moment', question: 'À quel moment de la journée avez-vous le plus besoin de votre rituel bien-être ?', options: [
     "Au réveil, pour dynamiser mon corps et bien démarrer la journée.",
@@ -245,7 +281,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isLogin, setIsLogin] = useState(true);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(getStoredUser);
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -326,16 +362,24 @@ export function AppLayout() {
     if (location.pathname !== '/') return undefined;
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const timeout = window.setTimeout(() => navigate('/accueil'), reducedMotion ? 800 : 5400);
+    const timeout = window.setTimeout(() => navigate('/auth'), reducedMotion ? 800 : 5400);
     return () => window.clearTimeout(timeout);
   }, [location.pathname, navigate]);
 
   useEffect(() => {
     if (location.pathname !== '/transition') return undefined;
 
-    const timeout = window.setTimeout(() => navigate('/dashboard'), 3500);
+    const userId = location.state?.userId ?? user?.id;
+    const shouldShowQuiz = userId && !window.localStorage.getItem(getQuizStorageKey(userId));
+    const timeout = window.setTimeout(() => {
+      if (shouldShowQuiz) {
+        navigate('/questionnaire', { state: { userId } });
+      } else {
+        navigate('/dashboard');
+      }
+    }, 3500);
     return () => window.clearTimeout(timeout);
-  }, [location.pathname, navigate]);
+  }, [location.pathname, location.state, navigate, user?.id]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -347,15 +391,41 @@ export function AppLayout() {
     setLoading(true);
 
     try {
-      const endpoint = isLogin ? '/login' : '/register';
-      const response = await axios.post(`${API_URL}${endpoint}`, formData);
-      
-      setUser(response.data.user);
-      localStorage.setItem('token', response.data.token);
-      
-      navigate('/transition');
+      const email = formData.email.trim().toLowerCase();
+      const users = getStoredUsers();
+      let authenticatedUser;
+
+      if (isLogin) {
+        const account = users.find((storedUser) => storedUser.email === email);
+        if (!account || await hashPassword(formData.password, account.passwordSalt) !== account.passwordHash) {
+          throw new Error('Adresse e-mail ou mot de passe invalide.');
+        }
+        authenticatedUser = { id: account.id, name: account.name, email: account.email };
+      } else {
+        const name = formData.name.trim();
+        if (!name) throw new Error('Veuillez renseigner votre prénom.');
+        if (formData.password.length < 8) throw new Error('Le mot de passe doit contenir au moins 8 caractères.');
+        if (users.some((storedUser) => storedUser.email === email)) {
+          throw new Error('Cette adresse e-mail est déjà utilisée sur ce navigateur.');
+        }
+
+        const passwordSalt = createSalt();
+        const account = {
+          id: crypto.randomUUID(),
+          name,
+          email,
+          passwordSalt,
+          passwordHash: await hashPassword(formData.password, passwordSalt),
+        };
+        window.localStorage.setItem(AUTH_USERS_STORAGE_KEY, JSON.stringify([...users, account]));
+        authenticatedUser = { id: account.id, name: account.name, email: account.email };
+      }
+
+      window.localStorage.setItem('token', authenticatedUser.id);
+      setUser(authenticatedUser);
+      navigate('/transition', { state: { userId: authenticatedUser.id } });
     } catch (err) {
-      setError(err.response?.data?.message || 'Une erreur est survenue.');
+      setError(err.message || 'Impossible de terminer l’authentification locale.');
     } finally {
       setLoading(false);
     }
@@ -397,6 +467,8 @@ export function AppLayout() {
 export default function App({ screen }) {
   const { isLogin, setIsLogin, user, formData, error, setError, loading, handleChange, handleSubmit, handleLogout, cart, addToCart, addBlendToCart, addCategoryBlendToCart, updateCartQuantity, favorites, toggleFavorite } = useOutletContext();
   const { categoryId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [brewSeconds, setBrewSeconds] = useState(0);
   const [blendIds, setBlendIds] = useState(['sencha', 'hibiscus']);
   const [blendName, setBlendName] = useState('Mon infusion personnalisée');
@@ -404,15 +476,17 @@ export default function App({ screen }) {
   const [blendTemperature, setBlendTemperature] = useState(85);
   const [blendMinutes, setBlendMinutes] = useState(4);
   const [blendAdded, setBlendAdded] = useState(false);
-  const [quizStatus, setQuizStatus] = useState(() => (typeof window !== 'undefined' ? window.localStorage.getItem(QUIZ_STORAGE_KEY) : null));
   const flavorCategory = flavorCategories.find((category) => category.id === categoryId);
+  const isQuizAuthorized = Boolean(user?.id ?? location.state?.userId);
   const finishQuiz = (productId) => {
-    window.localStorage.setItem(QUIZ_STORAGE_KEY, productId ? 'completed' : 'skipped');
+    const userId = user?.id ?? location.state?.userId;
+    if (userId) {
+      window.localStorage.setItem(getQuizStorageKey(userId), productId ? 'completed' : 'skipped');
+    }
     if (productId) {
       window.localStorage.setItem(SIGNATURE_STORAGE_KEY, productId);
     }
-    setQuizStatus(productId ? 'completed' : 'skipped');
-    if (productId) window.setTimeout(() => document.getElementById('selection')?.scrollIntoView({ behavior: 'smooth' }), 500);
+    navigate('/dashboard');
   };
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cart.reduce((total, item) => {
@@ -451,7 +525,7 @@ export default function App({ screen }) {
             <div className="intro-overlay" />
             <header className="intro-topbar">
               <div className="intro-brand"><img src={logo} alt="BENDJO" className="brand-mark" /><span><strong>BENDJO</strong><small>La sérénité a un goût</small></span></div>
-              <Link className="intro-skip" to="/accueil">Passer <ArrowRight size={14} /></Link>
+              <Link className="intro-skip" to="/auth">Passer <ArrowRight size={14} /></Link>
             </header>
 
             <div className="pour-scene" aria-hidden="true">
@@ -469,15 +543,17 @@ export default function App({ screen }) {
               <span className="intro-eyebrow"><Leaf size={13} /> LE TEMPS DE L'INFUSION</span>
               <h1>Tout commence<br />par une feuille.</h1><p className="banner-tagline">La sérénité a un goût</p>
               <p>Choisissez votre infusion. Laissez le temps faire le reste.</p>
-              <Link className="intro-enter" to="/accueil">Découvrir BENDJO <ArrowRight size={16} /></Link>
+              <Link className="intro-enter" to="/auth">Découvrir BENDJO <ArrowRight size={16} /></Link>
             </section>
             <div className="intro-progress" />
           </motion.main>
       )}
 
-      {screen === 'accueil' && !quizStatus && <WelcomeQuiz onFinish={finishQuiz} />}
+      {screen === 'questionnaire' && (isQuizAuthorized
+        ? <WelcomeQuiz onFinish={finishQuiz} />
+        : <Navigate to="/accueil" replace />)}
 
-      {screen === 'accueil' && quizStatus && (
+      {screen === 'accueil' && (
           <motion.div
             key="splash"
             initial={{ opacity: 0, y: 12 }}
@@ -590,6 +666,7 @@ export default function App({ screen }) {
                   type="password"
                   name="password"
                   placeholder="8 caractères minimum"
+                  minLength={8}
                   value={formData.password}
                   onChange={handleChange}
                   required
@@ -614,7 +691,7 @@ export default function App({ screen }) {
                 {isLogin ? 'Créer un compte' : 'Se connecter'}
               </button>
             </div>
-            <div className="auth-note"><Leaf size={15} /> Vos données restent privées, comme votre moment de calme.</div>
+            <div className="auth-note"><Leaf size={15} /> Mode test local : les comptes sont enregistrés dans ce navigateur uniquement.</div>
           </motion.div>
       )}
 
@@ -739,13 +816,12 @@ export default function App({ screen }) {
 
       {screen === 'categories' && (
         <motion.div key="categories" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="app-shell member-screen">
-          <PageHeader title="CATÉGORIES DES SAVEURS" />
-          <section className="page-intro">
+          <PageHeader title="CATÉGORIES DES SAVEURS" className="categories-page-header" />
+          <section className="page-intro categories-page-intro">
             <span className="eyebrow">CATÉGORIES DES SAVEURS</span>
             <h1>Toutes nos catégories</h1>
-            <p>Choisissez le moment ou l’envie qui vous ressemble.</p>
           </section>
-          <section className="collection-section flavor-categories-section">
+          <section className="collection-section flavor-categories-section categories-list-section">
             <div className="flavor-category-list">
               <FlavorCategoryCards categories={flavorCategories} />
             </div>
