@@ -1,3 +1,11 @@
+## Authentification
+
+Les formulaires de connexion et d’inscription utilisent les routes `/api/auth/login` et `/api/auth/register` du serveur Express.
+
+En développement, démarrez le serveur avec `npm run dev` dans `server/`; Vite transmet alors `/api` à `http://localhost:5000`.
+
+Pour le déploiement, configurez `VITE_API_URL` dans l’environnement de build Vercel avec l’origine du serveur Express (par exemple `https://api.example.com`, sans `/api` final). Sans cette variable, le client envoie les requêtes à `/api` sur la même origine.
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

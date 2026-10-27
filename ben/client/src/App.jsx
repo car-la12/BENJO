@@ -15,39 +15,13 @@ import goyave from './assets/goyave.jpg';
 import zeste from './assets/zeste.jpg';
 import basilic from './assets/basilic.jpg';
 
-const AUTH_USERS_STORAGE_KEY = 'bendjo_test_users';
-
-function getStoredUsers() {
-  const storedUsers = window.localStorage.getItem(AUTH_USERS_STORAGE_KEY);
-  if (!storedUsers) return [];
-
-  const users = JSON.parse(storedUsers);
-  if (!Array.isArray(users)) {
-    throw new Error('Les comptes de test enregistrés dans ce navigateur sont invalides.');
-  }
-  return users;
-}
+const AUTH_USER_STORAGE_KEY = 'bendjo_user';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
 
 function getStoredUser() {
-  const userId = window.localStorage.getItem('token');
-  if (!userId) return null;
-
-  const user = getStoredUsers().find((storedUser) => storedUser.id === userId);
-  return user ? { id: user.id, name: user.name, email: user.email } : null;
-}
-
-function createSalt() {
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function hashPassword(password, salt) {
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt: new TextEncoder().encode(salt), iterations: 120000, hash: 'SHA-256' },
-    key,
-    256,
-  );
-  return Array.from(new Uint8Array(bits), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  if (!window.localStorage.getItem('token')) return null;
+  const storedUser = window.localStorage.getItem(AUTH_USER_STORAGE_KEY);
+  return storedUser ? JSON.parse(storedUser) : null;
 }
 
 const products = [
@@ -392,40 +366,29 @@ export function AppLayout() {
 
     try {
       const email = formData.email.trim().toLowerCase();
-      const users = getStoredUsers();
-      let authenticatedUser;
-
-      if (isLogin) {
-        const account = users.find((storedUser) => storedUser.email === email);
-        if (!account || await hashPassword(formData.password, account.passwordSalt) !== account.passwordHash) {
-          throw new Error('Adresse e-mail ou mot de passe invalide.');
-        }
-        authenticatedUser = { id: account.id, name: account.name, email: account.email };
-      } else {
-        const name = formData.name.trim();
-        if (!name) throw new Error('Veuillez renseigner votre prénom.');
-        if (formData.password.length < 8) throw new Error('Le mot de passe doit contenir au moins 8 caractères.');
-        if (users.some((storedUser) => storedUser.email === email)) {
-          throw new Error('Cette adresse e-mail est déjà utilisée sur ce navigateur.');
-        }
-
-        const passwordSalt = createSalt();
-        const account = {
-          id: crypto.randomUUID(),
-          name,
+      const response = await fetch(`${API_BASE_URL}/api/auth/${isLogin ? 'login' : 'register'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(isLogin ? {} : { name: formData.name.trim() }),
           email,
-          passwordSalt,
-          passwordHash: await hashPassword(formData.password, passwordSalt),
-        };
-        window.localStorage.setItem(AUTH_USERS_STORAGE_KEY, JSON.stringify([...users, account]));
-        authenticatedUser = { id: account.id, name: account.name, email: account.email };
+          password: formData.password,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || 'Le serveur a refusé la demande d’authentification.');
+      }
+      if (!result.token || !result.user?.id) {
+        throw new Error('Le serveur a renvoyé une réponse d’authentification invalide.');
       }
 
-      window.localStorage.setItem('token', authenticatedUser.id);
-      setUser(authenticatedUser);
-      navigate('/transition', { state: { userId: authenticatedUser.id } });
+      window.localStorage.setItem('token', result.token);
+      window.localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(result.user));
+      setUser(result.user);
+      navigate('/transition', { state: { userId: result.user.id } });
     } catch (err) {
-      setError(err.message || 'Impossible de terminer l’authentification locale.');
+      setError(err.message || 'Impossible de joindre le serveur d’authentification.');
     } finally {
       setLoading(false);
     }
@@ -433,6 +396,7 @@ export function AppLayout() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem(AUTH_USER_STORAGE_KEY);
     setUser(null);
     navigate('/auth');
   };
@@ -691,7 +655,6 @@ export default function App({ screen }) {
                 {isLogin ? 'Créer un compte' : 'Se connecter'}
               </button>
             </div>
-            <div className="auth-note"><Leaf size={15} /> Mode test local : les comptes sont enregistrés dans ce navigateur uniquement.</div>
           </motion.div>
       )}
 

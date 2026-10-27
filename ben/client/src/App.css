@@ -549,7 +549,7 @@
   cursor: pointer;
   font-size: 10px;
   font-weight: 700;
-  var(--ivory)-space: nowrap;
+  white-space: nowrap;
 }
 
 .text-button:hover {
@@ -600,7 +600,7 @@
   font-weight: 400;
   letter-spacing: 0;
   text-overflow: ellipsis;
-  var(--ivory)-space: nowrap;
+  white-space: nowrap;
 }
 
 .tea-details p {
@@ -806,18 +806,6 @@
   cursor: pointer;
   font-size: inherit;
   font-weight: 700;
-}
-
-.auth-note {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  margin-top: 43px;
-  color: var(--basil);
-  font-size: 10px;
-  line-height: 1.5;
-  text-align: center;
 }
 
 .form-error {
@@ -1350,7 +1338,7 @@
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
-  var(--ivory)-space: nowrap;
+  white-space: nowrap;
 }
 
 .blend-choice:focus-within {
@@ -1617,9 +1605,6 @@
     margin-top: 38px;
   }
 
-  .auth-note {
-    margin-top: 26px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
