@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Clock3, Coffee, Heart, Leaf, Lock, LogOut, Mail, Minus, Plus, ShoppingBag, Sprout, Trash2, User } from 'lucide-react';
 import { Link, Navigate, Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
@@ -262,16 +262,18 @@ export function AppLayout() {
   const [cart, setCart] = useState([]);
   const [favorites, setFavorites] = useState([]);
 
-  const addToCart = (productId) => {
+  const addCartItem = useCallback((productId, customBlend) => {
     setCart((current) => {
       const existing = current.find((item) => item.productId === productId);
       return existing
         ? current.map((item) => item.productId === productId ? { ...item, quantity: item.quantity + 1 } : item)
-        : [...current, { productId, quantity: 1 }];
+        : [...current, { productId, quantity: 1, ...(customBlend ? { customBlend } : {}) }];
     });
-  };
+  }, []);
 
-  const addBlendToCart = ({ name, ingredientIds, servings, temperature, minutes }) => {
+  const addProductToCart = useCallback((productId) => addCartItem(productId), [addCartItem]);
+
+  const addBlendToCart = useCallback(({ name, ingredientIds, servings, temperature, minutes }) => {
     const ingredients = ingredientIds.map((id) => products.find((product) => product.id === id));
     const recipe = {
       name: name.trim() || 'Mon infusion personnalisée',
@@ -293,15 +295,10 @@ export function AppLayout() {
       },
     };
 
-    setCart((current) => {
-      const existing = current.find((item) => item.productId === productId);
-      return existing
-        ? current.map((item) => item.productId === productId ? { ...item, quantity: item.quantity + 1 } : item)
-        : [...current, { productId, quantity: 1, customBlend }];
-    });
-  };
+    addCartItem(productId, customBlend);
+  }, [addCartItem]);
 
-  const addCategoryBlendToCart = (category, blend) => {
+  const addCategoryBlendToCart = useCallback((category, blend) => {
     const productId = `category:${category.id}:${blend.id}`;
     const customBlend = {
       id: productId,
@@ -312,12 +309,53 @@ export function AppLayout() {
       ingredients: blend.ingredients,
     };
 
-    setCart((current) => {
-      const existing = current.find((item) => item.productId === productId);
-      return existing
-        ? current.map((item) => item.productId === productId ? { ...item, quantity: item.quantity + 1 } : item)
-        : [...current, { productId, quantity: 1, customBlend }];
-    });
+    addCartItem(productId, customBlend);
+  }, [addCartItem]);
+
+  const addPendingCartAddition = useCallback((pendingCartAddition) => {
+    if (pendingCartAddition?.type === 'product') {
+      addProductToCart(pendingCartAddition.productId);
+    } else if (pendingCartAddition?.type === 'blend') {
+      addBlendToCart(pendingCartAddition.blend);
+    } else if (pendingCartAddition?.type === 'category-blend') {
+      addCategoryBlendToCart(pendingCartAddition.category, pendingCartAddition.blend);
+    }
+  }, [addProductToCart, addBlendToCart, addCategoryBlendToCart]);
+
+  const requestCartAddition = (pendingCartAddition) => {
+    setError('');
+    navigate('/auth', { state: { pendingCartAddition } });
+    return false;
+  };
+
+  const requireAuthenticationForCartAddition = (pendingCartAddition, addItem) => {
+    if (!user?.id) {
+      return requestCartAddition(pendingCartAddition);
+    }
+
+    addItem();
+    return true;
+  };
+
+  const addAuthenticatedProductToCart = (productId) => {
+    return requireAuthenticationForCartAddition(
+      { type: 'product', productId },
+      () => addProductToCart(productId),
+    );
+  };
+
+  const addAuthenticatedBlendToCart = (blend) => {
+    return requireAuthenticationForCartAddition(
+      { type: 'blend', blend },
+      () => addBlendToCart(blend),
+    );
+  };
+
+  const addAuthenticatedCategoryBlendToCart = (category, blend) => {
+    return requireAuthenticationForCartAddition(
+      { type: 'category-blend', category, blend },
+      () => addCategoryBlendToCart(category, blend),
+    );
   };
 
   const updateCartQuantity = (productId, quantity) => {
@@ -336,7 +374,7 @@ export function AppLayout() {
     if (location.pathname !== '/') return undefined;
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const timeout = window.setTimeout(() => navigate('/auth'), reducedMotion ? 800 : 5400);
+    const timeout = window.setTimeout(() => navigate('/questionnaire'), reducedMotion ? 800 : 5400);
     return () => window.clearTimeout(timeout);
   }, [location.pathname, navigate]);
 
@@ -344,16 +382,22 @@ export function AppLayout() {
     if (location.pathname !== '/transition') return undefined;
 
     const userId = location.state?.userId ?? user?.id;
-    const shouldShowQuiz = userId && !window.localStorage.getItem(getQuizStorageKey(userId));
+    const shouldShowQuiz = userId
+      && !window.localStorage.getItem(getQuizStorageKey(userId))
+      && !window.localStorage.getItem(QUIZ_STORAGE_KEY);
+    const pendingCartAddition = location.state?.pendingCartAddition;
     const timeout = window.setTimeout(() => {
       if (shouldShowQuiz) {
-        navigate('/questionnaire', { state: { userId } });
+        navigate('/questionnaire', { state: { userId, pendingCartAddition } });
+      } else if (pendingCartAddition) {
+        addPendingCartAddition(pendingCartAddition);
+        navigate('/panier');
       } else {
         navigate('/dashboard');
       }
     }, 3500);
     return () => window.clearTimeout(timeout);
-  }, [location.pathname, location.state, navigate, user?.id]);
+  }, [location.pathname, location.state, navigate, user?.id, addPendingCartAddition]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -386,7 +430,11 @@ export function AppLayout() {
       window.localStorage.setItem('token', result.token);
       window.localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(result.user));
       setUser(result.user);
-      navigate('/transition', { state: { userId: result.user.id } });
+
+      const pendingCartAddition = location.state?.pendingCartAddition;
+      navigate('/transition', {
+        state: { userId: result.user.id, pendingCartAddition },
+      });
     } catch (err) {
       setError(err.message || 'Impossible de joindre le serveur d’authentification.');
     } finally {
@@ -416,9 +464,10 @@ export function AppLayout() {
           handleSubmit,
           handleLogout,
           cart,
-          addToCart,
-          addBlendToCart,
-          addCategoryBlendToCart,
+          addToCart: addAuthenticatedProductToCart,
+          addBlendToCart: addAuthenticatedBlendToCart,
+          addCategoryBlendToCart: addAuthenticatedCategoryBlendToCart,
+          addPendingCartAddition,
           updateCartQuantity,
           favorites,
           toggleFavorite,
@@ -429,7 +478,7 @@ export function AppLayout() {
 }
 
 export default function App({ screen }) {
-  const { isLogin, setIsLogin, user, formData, error, setError, loading, handleChange, handleSubmit, handleLogout, cart, addToCart, addBlendToCart, addCategoryBlendToCart, updateCartQuantity, favorites, toggleFavorite } = useOutletContext();
+  const { isLogin, setIsLogin, user, formData, error, setError, loading, handleChange, handleSubmit, handleLogout, cart, addToCart, addBlendToCart, addCategoryBlendToCart, addPendingCartAddition, updateCartQuantity, favorites, toggleFavorite } = useOutletContext();
   const { categoryId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -441,16 +490,23 @@ export default function App({ screen }) {
   const [blendMinutes, setBlendMinutes] = useState(4);
   const [blendAdded, setBlendAdded] = useState(false);
   const flavorCategory = flavorCategories.find((category) => category.id === categoryId);
-  const isQuizAuthorized = Boolean(user?.id ?? location.state?.userId);
   const finishQuiz = (productId) => {
     const userId = user?.id ?? location.state?.userId;
+    const pendingCartAddition = location.state?.pendingCartAddition;
+    const quizStatus = productId ? 'completed' : 'skipped';
+    window.localStorage.setItem(QUIZ_STORAGE_KEY, quizStatus);
     if (userId) {
-      window.localStorage.setItem(getQuizStorageKey(userId), productId ? 'completed' : 'skipped');
+      window.localStorage.setItem(getQuizStorageKey(userId), quizStatus);
     }
     if (productId) {
       window.localStorage.setItem(SIGNATURE_STORAGE_KEY, productId);
     }
-    navigate('/dashboard');
+    if (pendingCartAddition) {
+      addPendingCartAddition(pendingCartAddition);
+      navigate('/panier');
+    } else {
+      navigate('/accueil');
+    }
   };
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cart.reduce((total, item) => {
@@ -507,17 +563,16 @@ export default function App({ screen }) {
               <span className="intro-eyebrow"><Leaf size={13} /> LE TEMPS DE L'INFUSION</span>
               <h1>Tout commence<br />par une feuille.</h1><p className="banner-tagline">La sérénité a un goût</p>
               <p>Choisissez votre infusion. Laissez le temps faire le reste.</p>
-              <Link className="intro-enter" to="/auth">Découvrir BENDJO <ArrowRight size={16} /></Link>
+              <Link className="intro-enter" to="/questionnaire">Découvrir BENDJO <ArrowRight size={16} /></Link>
             </section>
             <div className="intro-progress" />
           </motion.main>
       )}
 
-      {screen === 'questionnaire' && (isQuizAuthorized
-        ? <WelcomeQuiz onFinish={finishQuiz} />
-        : <Navigate to="/accueil" replace />)}
+      {screen === 'questionnaire' && <WelcomeQuiz onFinish={finishQuiz} />}
 
-      {screen === 'accueil' && (
+      {screen === 'accueil' && (window.localStorage.getItem(QUIZ_STORAGE_KEY)
+        ? (
           <motion.div
             key="splash"
             initial={{ opacity: 0, y: 12 }}
@@ -564,7 +619,8 @@ export default function App({ screen }) {
 
             <BottomNav active="accueil" cartCount={cartCount} />
           </motion.div>
-      )}
+        )
+        : <Navigate to="/questionnaire" replace />)}
 
       {screen === 'auth' && (
           <motion.div
@@ -582,8 +638,12 @@ export default function App({ screen }) {
             </header>
             <div className="auth-content">
               <span className="eyebrow">VOTRE PAUSE COMMENCE ICI</span>
-              <h1>{isLogin ? 'Ravi de vous retrouver.' : 'Bienvenue chez BENDJO.'}</h1>
-              <p className="auth-intro">{isLogin ? 'Connectez-vous pour retrouver vos infusions et vos rituels.' : 'Créez votre compte et composez votre premier rituel.'}</p>
+              <h1>{isLogin ? 'Connectez-vous pour continuer.' : 'Bienvenue chez BENDJO.'}</h1>
+              <p className="auth-intro">{location.state?.pendingCartAddition
+                ? 'Connectez-vous ou créez un compte pour ajouter cette infusion à votre panier.'
+                : isLogin
+                  ? 'Connectez-vous pour retrouver vos infusions et vos rituels.'
+                  : 'Créez votre compte et composez votre premier rituel.'}</p>
             </div>
 
             {error && (
@@ -975,8 +1035,8 @@ export default function App({ screen }) {
             <div className="blend-order">
               <p>Ajoutez votre infusion personnalisée au panier. Le paiement en ligne n'est pas encore configuré.</p>
               <button type="button" className="primary-button blend-order-button" disabled={!blendIds.length} onClick={() => {
-                addBlendToCart({ name: blendName, ingredientIds: blendIds, servings: blendServings, temperature: blendTemperature, minutes: blendMinutes });
-                setBlendAdded(true);
+                const added = addBlendToCart({ name: blendName, ingredientIds: blendIds, servings: blendServings, temperature: blendTemperature, minutes: blendMinutes });
+                if (added) setBlendAdded(true);
               }}>
                 <ShoppingBag size={16} /> Ajouter mon infusion au panier · {formatPrice(blendPrice)}
               </button>
