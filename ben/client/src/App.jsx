@@ -35,6 +35,19 @@ const products = [
   { id: 'earl-grey', name: 'Earl Grey bergamote', type: 'THÉ NOIR · AGRUMES', description: 'Thé noir corsé et bergamote fraîche', price: 2500, image: img4, steep: '3 min', temperature: '90 °C' },
 ];
 
+const momentProduct = {
+  id: 'moment',
+  anchorId: 'coffret-moment',
+  name: 'Pack de 6 + pot de miel',
+  type: 'OFFRE DU MOMENT',
+  description: '6 infusions accompagnées d’un pot de miel inclus.',
+  price: 13000,
+  compareAtPrice: 15000,
+  image: img1,
+  imageAlt: 'Pack de six infusions BENDJO',
+};
+const catalogProducts = [...products, momentProduct];
+
 const flavorCategories = [
   {
     id: 'energisants',
@@ -123,13 +136,16 @@ function PageHeader({ title = 'BENDJO', className = '' }) {
 
 function ProductRow({ product, favorite, onToggleFavorite, onAddToCart }) {
   return (
-    <article className="tea-item">
-      <div className="tea-image"><img src={product.image} alt={`Infusion ${product.name}`} /></div>
+    <article className="tea-item" id={product.anchorId}>
+      <div className="tea-image"><img src={product.image} alt={product.imageAlt || `Infusion ${product.name}`} /></div>
       <div className="tea-details">
         <span className="tea-type">{product.type}</span>
         <h3>{product.name}</h3>
         <p>{product.description}</p>
-        <strong className="product-price">{formatPrice(product.price)}</strong>
+        <strong className="product-price">
+          {product.compareAtPrice && <>Au lieu de <del>{formatPrice(product.compareAtPrice)}</del></>}
+          {formatPrice(product.price)}
+        </strong>
       </div>
       <div className="product-actions">
         <button className={`favorite-button${favorite ? ' is-favorite' : ''}`} type="button" onClick={() => onToggleFavorite(product.id)} aria-label={`${favorite ? 'Retirer' : 'Ajouter'} ${product.name} des favoris`} aria-pressed={favorite}>
@@ -138,6 +154,32 @@ function ProductRow({ product, favorite, onToggleFavorite, onAddToCart }) {
         <button className="add-button" type="button" onClick={() => onAddToCart(product.id)} aria-label={`Ajouter ${product.name} au panier`}><Plus size={17} /></button>
       </div>
     </article>
+  );
+}
+
+function MomentBanner({ onAddToCart }) {
+  return (
+    <aside className="moment-banner" aria-labelledby="moment-banner-title">
+      <div className="moment-banner-visual">
+        <img src={momentProduct.image} alt={momentProduct.imageAlt} className="moment-banner-image" />
+      </div>
+      <div className="moment-banner-copy">
+        <span className="eyebrow">OFFRE DU MOMENT</span>
+        <h2 id="moment-banner-title">Pack de 6 + pot de miel</h2>
+        <p>6 infusions avec un pot de miel inclus.</p>
+        <div className="moment-banner-actions">
+          <strong>
+            <span>Au lieu de</span>
+            <del>{formatPrice(momentProduct.compareAtPrice)}</del>
+            {formatPrice(momentProduct.price)}
+          </strong>
+          <button className="primary-button" type="button" onClick={() => onAddToCart(momentProduct.id)}>
+            <ShoppingBag size={16} /> Ajouter le pack
+          </button>
+        </div>
+        <Link className="text-button" to="/collection#coffret-moment">Voir le pack <ArrowRight size={14} /></Link>
+      </div>
+    </aside>
   );
 }
 
@@ -510,7 +552,7 @@ export default function App({ screen }) {
   };
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cart.reduce((total, item) => {
-    const product = item.customBlend || products.find((entry) => entry.id === item.productId);
+    const product = item.customBlend || catalogProducts.find((entry) => entry.id === item.productId);
     return total + (product ? product.price * item.quantity : 0);
   }, 0);
   const blendPrice = blendIds.reduce((total, id) => {
@@ -606,6 +648,8 @@ export default function App({ screen }) {
               </div>
               <span className="image-credit">UN MOMENT POUR SOI</span>
             </section>
+
+            <MomentBanner onAddToCart={addToCart} />
 
             <section className="collection-section flavor-categories-section" id="selection">
               <div className="section-heading">
@@ -783,11 +827,11 @@ export default function App({ screen }) {
           <section className="page-intro">
             <span className="eyebrow">FEUILLES CHOISIES AVEC SOIN</span>
             <h1>La collection</h1>
-            <p>Huit infusions et thés pour trouver le goût de votre prochaine pause.</p>
+            <p>Huit infusions et thés, ainsi qu’un coffret pour découvrir toute la collection.</p>
           </section>
           <section className="collection-section catalog-section">
             <div className="tea-list">
-              {products.map((product) => (
+              {catalogProducts.map((product) => (
                 <ProductRow key={product.id} product={product} favorite={favorites.includes(product.id)} onToggleFavorite={toggleFavorite} onAddToCart={addToCart} />
               ))}
             </div>
@@ -903,7 +947,7 @@ export default function App({ screen }) {
             <section className="cart-content">
               <div className="cart-items">
                 {cart.map((item) => {
-                  const product = item.customBlend || products.find((entry) => entry.id === item.productId);
+                  const product = item.customBlend || catalogProducts.find((entry) => entry.id === item.productId);
                   if (!product) return null;
                   return (
                     <article className="cart-item" key={item.productId}>
