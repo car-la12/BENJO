@@ -24,29 +24,40 @@ function getStoredUser() {
   return storedUser ? JSON.parse(storedUser) : null;
 }
 
-const products = [
-  { id: 'hibiscus', name: 'Hibiscus', type: 'INFUSION · FLEURS', description: 'Végétal, doux et vibrant', price: 2500, image: img1, steep: '5 min', temperature: '95 °C' },
-  { id: 'jardin-soir', name: 'Jardin du soir', type: 'INFUSION · SANS THÉINE', description: 'Verveine, mélisse, tilleul', price: 2500, image: img2, steep: '6 min', temperature: '95 °C' },
-  { id: 'gingembre', name: 'Gingembre', type: 'INFUSION · ÉPICÉE', description: 'Gingembre, cannelle, citron', price: 2500, image: img3, steep: '5 min', temperature: '95 °C' },
-  { id: 'fleur-the', name: 'Fleur de thé', type: 'INFUSION · FLEURS', description: 'Jasmin, rose et camomille', price: 2500, image: img4, steep: '4 min', temperature: '85 °C' },
-  { id: 'matcha', name: 'Matcha cérémonial', type: 'THÉ VERT · JAPON', description: 'Fin, végétal et délicatement umami', price: 2500, image: img1, steep: 'Fouetter 30 s', temperature: '75 °C' },
-  { id: 'sencha', name: 'Sencha du matin', type: 'THÉ VERT · JAPON', description: 'Frais et lumineux, idéal au réveil', price: 2500, image: img2, steep: '2 min', temperature: '75 °C' },
-  { id: 'rooibos', name: 'Rooibos vanillé', type: 'ROOIBOS · SANS THÉINE', description: 'Rond, doux et naturellement sucré', price: 2500, image: img3, steep: '7 min', temperature:'95 °C' },
-  { id: 'earl-grey', name: 'Earl Grey bergamote', type: 'THÉ NOIR · AGRUMES', description: 'Thé noir corsé et bergamote fraîche', price: 2500, image: img4, steep: '3 min', temperature: '90 °C' },
-];
+async function readApiResponse(response) {
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error('Le serveur a renvoyé une réponse illisible.');
+  }
+  if (!response.ok) throw new Error(result.message || 'La demande a échoué.');
+  return result;
+}
 
-const momentProduct = {
-  id: 'moment',
-  anchorId: 'coffret-moment',
-  name: 'Pack de 6 + pot de miel',
-  type: 'OFFRE DU MOMENT',
-  description: '6 infusions accompagnées d’un pot de miel inclus.',
-  price: 13000,
-  compareAtPrice: 15000,
-  image: img1,
-  imageAlt: 'Pack de six infusions BENDJO',
+async function fetchPublicProducts() {
+  const response = await fetch(`${API_BASE_URL}/api/products`);
+  return readApiResponse(response);
+}
+
+const productImageAssets = {
+  'IMG_0389.PNG': img1,
+  'IMG_0390.PNG': img2,
+  'IMG_0391.PNG': img3,
+  'IMG_0392.PNG': img4,
 };
-const catalogProducts = [...products, momentProduct];
+const productImageChoices = Object.keys(productImageAssets);
+const getProductImage = (image) => productImageAssets[image] || image;
+const emptyProductForm = {
+  name: '',
+  type: '',
+  description: '',
+  price: '2500',
+  compareAtPrice: '',
+  image: productImageChoices[0],
+  steep: '',
+  temperature: '',
+};
 
 const flavorCategories = [
   {
@@ -136,8 +147,8 @@ function PageHeader({ title = 'BENDJO', className = '' }) {
 
 function ProductRow({ product, favorite, onToggleFavorite, onAddToCart }) {
   return (
-    <article className="tea-item" id={product.anchorId}>
-      <div className="tea-image"><img src={product.image} alt={product.imageAlt || `Infusion ${product.name}`} /></div>
+    <article className="tea-item" id={product.id}>
+      <div className="tea-image"><img src={getProductImage(product.image)} alt={`Infusion ${product.name}`} /></div>
       <div className="tea-details">
         <span className="tea-type">{product.type}</span>
         <h3>{product.name}</h3>
@@ -157,27 +168,240 @@ function ProductRow({ product, favorite, onToggleFavorite, onAddToCart }) {
   );
 }
 
-function MomentBanner({ onAddToCart }) {
+function AdminProducts({ token, setToken, onLogout, refreshProducts }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [adminProducts, setAdminProducts] = useState([]);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [form, setForm] = useState(emptyProductForm);
+  const [loading, setLoading] = useState(Boolean(token));
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const adminRequest = useCallback(async (path, options = {}) => {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        Authorization: `Bearer ${token}`,
+        ...options.headers,
+      },
+    });
+    return readApiResponse(response);
+  }, [token]);
+
+  const loadAdminProducts = useCallback(async () => {
+    try {
+      setAdminProducts(await adminRequest('/api/admin/products'));
+      setError('');
+    } catch (err) {
+      setError(err.message || 'Impossible de charger les produits.');
+      if (/401|session administrateur/i.test(err.message)) onLogout();
+    } finally {
+      setLoading(false);
+    }
+  }, [adminRequest, onLogout]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+
+    let active = true;
+    adminRequest('/api/admin/products')
+      .then((result) => {
+        if (!active) return;
+        setAdminProducts(result);
+        setError('');
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err.message || 'Impossible de charger les produits.');
+        if (/401|session administrateur/i.test(err.message)) onLogout();
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [adminRequest, onLogout, token]);
+
+  const handleLogin = async (event) => {
+    event.preventDefault();
+    setError('');
+    setLoginLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const result = await readApiResponse(response);
+      if (!result.token) throw new Error('Le serveur n’a pas renvoyé de session administrateur.');
+      window.localStorage.setItem('bendjo_admin_token', result.token);
+      setLoading(true);
+      setToken(result.token);
+      setPassword('');
+    } catch (err) {
+      setError(err.message || 'Impossible de se connecter au CMS.');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const startEditing = (product) => {
+    setEditingProduct(product);
+    setForm({
+      name: product.name,
+      type: product.type,
+      description: product.description,
+      price: String(product.price),
+      compareAtPrice: product.compareAtPrice == null ? '' : String(product.compareAtPrice),
+      image: product.image,
+      steep: product.steep || '',
+      temperature: product.temperature || '',
+    });
+    setNotice('');
+    setError('');
+  };
+
+  const resetForm = () => {
+    setEditingProduct(null);
+    setForm(emptyProductForm);
+  };
+
+  const handleSave = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      await adminRequest(
+        editingProduct ? `/api/admin/products/${encodeURIComponent(editingProduct.id)}` : '/api/admin/products',
+        {
+          method: editingProduct ? 'PUT' : 'POST',
+          body: JSON.stringify(form),
+        },
+      );
+      resetForm();
+      setNotice(editingProduct ? 'Les modifications ont été enregistrées.' : 'Le produit a été créé.');
+      await Promise.all([loadAdminProducts(), refreshProducts()]);
+    } catch (err) {
+      setError(err.message || 'Impossible d’enregistrer le produit.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleProductStatus = async (product) => {
+    setError('');
+    setNotice('');
+    try {
+      await adminRequest(`/api/admin/products/${encodeURIComponent(product.id)}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isActive: !product.isActive }),
+      });
+      setNotice(product.isActive ? 'Le produit a été désactivé.' : 'Le produit a été publié.');
+      await Promise.all([loadAdminProducts(), refreshProducts()]);
+    } catch (err) {
+      setError(err.message || 'Impossible de modifier le statut du produit.');
+    }
+  };
+
+  if (!token) {
+    return (
+      <main className="app-shell admin-screen">
+        <PageHeader title="ADMINISTRATION" />
+        <section className="admin-login">
+          <span className="eyebrow">ESPACE PRIVÉ</span>
+          <h1>Administration des produits</h1>
+          <p>Connectez-vous pour gérer le catalogue BENDJO.</p>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <form className="auth-form" onSubmit={handleLogin}>
+            <label className="field-wrap">
+              <span>Adresse e-mail</span>
+              <input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            </label>
+            <label className="field-wrap">
+              <span>Mot de passe</span>
+              <input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+            </label>
+            <button type="submit" className="primary-button auth-submit" disabled={loginLoading}>
+              {loginLoading ? 'Connexion…' : 'Se connecter'} <ArrowRight size={17} />
+            </button>
+          </form>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="app-shell admin-screen">
+      <PageHeader title="ADMINISTRATION" />
+      <section className="admin-header">
+        <div>
+          <span className="eyebrow">CMS BENDJO</span>
+          <h1>Produits</h1>
+          <p>Les modifications sont enregistrées dans la base de données.</p>
+        </div>
+        <button type="button" className="admin-logout" onClick={onLogout}>Déconnexion</button>
+      </section>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {notice && <p className="admin-notice" role="status">{notice}</p>}
+      <form className="admin-product-form" onSubmit={handleSave}>
+        <h2>{editingProduct ? `Modifier ${editingProduct.name}` : 'Ajouter un produit'}</h2>
+        <label><span>Nom</span><input value={form.name} maxLength={120} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></label>
+        <label><span>Type</span><input value={form.type} maxLength={80} onChange={(event) => setForm({ ...form, type: event.target.value })} required /></label>
+        <label className="admin-description-field"><span>Description</span><textarea value={form.description} maxLength={1000} rows={3} onChange={(event) => setForm({ ...form, description: event.target.value })} required /></label>
+        <label><span>Prix (FCFA)</span><input type="number" min="0" step="1" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} required /></label>
+        <label><span>Prix barré (facultatif)</span><input type="number" min="0" step="1" value={form.compareAtPrice} onChange={(event) => setForm({ ...form, compareAtPrice: event.target.value })} /></label>
+        <label><span>Image (nom local ou URL HTTPS)</span><input list="product-image-options" value={form.image} onChange={(event) => setForm({ ...form, image: event.target.value })} required /><datalist id="product-image-options">{productImageChoices.map((image) => <option value={image} key={image} />)}</datalist></label>
+        <label><span>Temps d’infusion</span><input value={form.steep} maxLength={40} onChange={(event) => setForm({ ...form, steep: event.target.value })} /></label>
+        <label><span>Température</span><input value={form.temperature} maxLength={30} onChange={(event) => setForm({ ...form, temperature: event.target.value })} /></label>
+        <div className="admin-form-actions">
+          <button type="submit" className="primary-button" disabled={saving}>{saving ? 'Enregistrement…' : editingProduct ? 'Enregistrer' : 'Créer le produit'}</button>
+          {editingProduct && <button type="button" className="admin-cancel" onClick={resetForm}>Annuler</button>}
+        </div>
+      </form>
+      <section className="admin-product-list" aria-labelledby="admin-product-list-title">
+        <h2 id="admin-product-list-title">Catalogue ({adminProducts.length})</h2>
+        {loading && <p className="catalog-status" role="status">Chargement…</p>}
+        {!loading && adminProducts.map((product) => (
+          <article className={`admin-product-row${product.isActive ? '' : ' is-inactive'}`} key={product.id}>
+            <img src={getProductImage(product.image)} alt="" />
+            <div className="admin-product-copy">
+              <strong>{product.name}</strong>
+              <span>{formatPrice(product.price)} · {product.isActive ? 'Publié' : 'Désactivé'}</span>
+            </div>
+            <button type="button" className="admin-edit-button" onClick={() => startEditing(product)}>Modifier</button>
+            <button type="button" className="admin-status-button" onClick={() => toggleProductStatus(product)}>{product.isActive ? 'Désactiver' : 'Publier'}</button>
+          </article>
+        ))}
+      </section>
+    </main>
+  );
+}
+
+function MomentBanner({ product, onAddToCart }) {
   return (
     <aside className="moment-banner" aria-labelledby="moment-banner-title">
       <div className="moment-banner-visual">
-        <img src={momentProduct.image} alt={momentProduct.imageAlt} className="moment-banner-image" />
+        <img src={getProductImage(product.image)} alt={product.name} className="moment-banner-image" />
       </div>
       <div className="moment-banner-copy">
-        <span className="eyebrow">OFFRE DU MOMENT</span>
-        <h2 id="moment-banner-title">Pack de 6 + pot de miel</h2>
-        <p>6 infusions avec un pot de miel inclus.</p>
+        <span className="eyebrow">{product.type}</span>
+        <h2 id="moment-banner-title">{product.name}</h2>
+        <p>{product.description}</p>
         <div className="moment-banner-actions">
           <strong>
-            <span>Au lieu de</span>
-            <del>{formatPrice(momentProduct.compareAtPrice)}</del>
-            {formatPrice(momentProduct.price)}
+            {product.compareAtPrice && <><span>Au lieu de</span><del>{formatPrice(product.compareAtPrice)}</del></>}
+            {formatPrice(product.price)}
           </strong>
-          <button className="primary-button" type="button" onClick={() => onAddToCart(momentProduct.id)}>
-            <ShoppingBag size={16} /> Ajouter le pack
+          <button className="primary-button" type="button" onClick={() => onAddToCart(product.id)}>
+            <ShoppingBag size={16} /> Ajouter
           </button>
         </div>
-        <Link className="text-button" to="/collection#coffret-moment">Voir le pack <ArrowRight size={14} /></Link>
+        <Link className="text-button" to={`/collection#${product.id}`}>Voir le produit <ArrowRight size={14} /></Link>
       </div>
     </aside>
   );
@@ -232,7 +456,7 @@ function computeQuizResult(answers) {
   return tied.includes(answers[answers.length - 1]) ? answers[answers.length - 1] : tied[0];
 }
 
-function WelcomeQuiz({ onFinish }) {
+function WelcomeQuiz({ onFinish, products, productsLoading, productsError }) {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState([]);
   const isResult = step >= quizQuestions.length;
@@ -277,13 +501,17 @@ function WelcomeQuiz({ onFinish }) {
         </section>
       ) : (
         <section className="quiz-body quiz-result">
-          <span className="eyebrow">VOTRE INFUSION SIGNATURE</span>
-          <div className="quiz-result-image"><img src={resultProduct.image} alt={`Infusion ${resultProduct.name}`} /></div>
-          <span className="tea-type">{resultProduct.type}</span>
-          <h1>{resultProduct.name}</h1>
-          <p>{resultProduct.description}</p>
-          <p className="quiz-result-ritual"><Clock3 size={14} /> {resultProduct.steep} · {resultProduct.temperature}</p>
-          <button className="primary-button" type="button" onClick={() => onFinish(resultProduct.id)}>Découvrir mon infusion signature <ArrowRight size={16} /></button>
+          {resultProduct ? (
+            <>
+              <span className="eyebrow">VOTRE INFUSION SIGNATURE</span>
+              <div className="quiz-result-image"><img src={getProductImage(resultProduct.image)} alt={`Infusion ${resultProduct.name}`} /></div>
+              <span className="tea-type">{resultProduct.type}</span>
+              <h1>{resultProduct.name}</h1>
+              <p>{resultProduct.description}</p>
+              <p className="quiz-result-ritual"><Clock3 size={14} /> {resultProduct.steep} · {resultProduct.temperature}</p>
+              <button className="primary-button" type="button" onClick={() => onFinish(resultProduct.id)}>Découvrir mon infusion signature <ArrowRight size={16} /></button>
+            </>
+          ) : <p role={productsLoading ? 'status' : 'alert'}>{productsLoading ? 'Chargement des produits…' : productsError || 'Aucun produit recommandé n’est disponible.'}</p>}
           <button className="quiz-back" type="button" onClick={() => { setAnswers([]); setStep(0); }}>Recommencer le quiz</button>
         </section>
       )}
@@ -303,20 +531,57 @@ export function AppLayout() {
   const [loading, setLoading] = useState(false);
   const [cart, setCart] = useState([]);
   const [favorites, setFavorites] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState('');
+  const [adminToken, setAdminToken] = useState(() => window.localStorage.getItem('bendjo_admin_token') || '');
 
-  const addCartItem = useCallback((productId, customBlend) => {
+  const refreshProducts = useCallback(async () => {
+    try {
+      const result = await fetchPublicProducts();
+      setProducts(result);
+      setProductsError('');
+    } catch (err) {
+      setProductsError(err.message || 'Impossible de charger le catalogue.');
+    } finally {
+      setProductsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetchPublicProducts()
+      .then((result) => {
+        if (active) setProducts(result);
+      })
+      .catch((err) => {
+        if (active) setProductsError(err.message || 'Impossible de charger le catalogue.');
+      })
+      .finally(() => {
+        if (active) setProductsLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
+
+  const addCartItem = useCallback((productId, customBlend, productSnapshot) => {
     setCart((current) => {
       const existing = current.find((item) => item.productId === productId);
       return existing
         ? current.map((item) => item.productId === productId ? { ...item, quantity: item.quantity + 1 } : item)
-        : [...current, { productId, quantity: 1, ...(customBlend ? { customBlend } : {}) }];
+        : [...current, { productId, quantity: 1, ...(customBlend ? { customBlend } : {}), ...(productSnapshot ? { productSnapshot } : {}) }];
     });
   }, []);
 
-  const addProductToCart = useCallback((productId) => addCartItem(productId), [addCartItem]);
+  const addProductToCart = useCallback((productId) => {
+    const product = products.find((entry) => entry.id === productId);
+    if (!product) return false;
+    addCartItem(productId, undefined, product);
+    return true;
+  }, [addCartItem, products]);
 
   const addBlendToCart = useCallback(({ name, ingredientIds, servings, temperature, minutes }) => {
     const ingredients = ingredientIds.map((id) => products.find((product) => product.id === id));
+    if (ingredients.some((ingredient) => !ingredient)) return;
     const recipe = {
       name: name.trim() || 'Mon infusion personnalisée',
       ingredientIds: [...ingredientIds].sort(),
@@ -338,7 +603,7 @@ export function AppLayout() {
     };
 
     addCartItem(productId, customBlend);
-  }, [addCartItem]);
+  }, [addCartItem, products]);
 
   const addCategoryBlendToCart = useCallback((category, blend) => {
     const productId = `category:${category.id}:${blend.id}`;
@@ -491,6 +756,11 @@ export function AppLayout() {
     navigate('/auth');
   };
 
+  const handleAdminLogout = useCallback(() => {
+    window.localStorage.removeItem('bendjo_admin_token');
+    setAdminToken('');
+  }, []);
+
   return (
     <div className="page-canvas">
       <AnimatePresence mode="wait">
@@ -513,6 +783,13 @@ export function AppLayout() {
           updateCartQuantity,
           favorites,
           toggleFavorite,
+          products,
+          productsLoading,
+          productsError,
+          refreshProducts,
+          adminToken,
+          setAdminToken,
+          handleAdminLogout,
         }} />
       </AnimatePresence>
     </div>
@@ -520,7 +797,7 @@ export function AppLayout() {
 }
 
 export default function App({ screen }) {
-  const { isLogin, setIsLogin, user, formData, error, setError, loading, handleChange, handleSubmit, handleLogout, cart, addToCart, addBlendToCart, addCategoryBlendToCart, addPendingCartAddition, updateCartQuantity, favorites, toggleFavorite } = useOutletContext();
+  const { isLogin, setIsLogin, user, formData, error, setError, loading, handleChange, handleSubmit, handleLogout, cart, addToCart, addBlendToCart, addCategoryBlendToCart, addPendingCartAddition, updateCartQuantity, favorites, toggleFavorite, products, productsLoading, productsError, refreshProducts, adminToken, setAdminToken, handleAdminLogout } = useOutletContext();
   const { categoryId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -532,6 +809,8 @@ export default function App({ screen }) {
   const [blendMinutes, setBlendMinutes] = useState(4);
   const [blendAdded, setBlendAdded] = useState(false);
   const flavorCategory = flavorCategories.find((category) => category.id === categoryId);
+  const senchaProduct = products.find((product) => product.id === 'sencha');
+  const momentProduct = products.find((product) => product.id === 'moment');
   const finishQuiz = (productId) => {
     const userId = user?.id ?? location.state?.userId;
     const pendingCartAddition = location.state?.pendingCartAddition;
@@ -552,7 +831,7 @@ export default function App({ screen }) {
   };
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cart.reduce((total, item) => {
-    const product = item.customBlend || catalogProducts.find((entry) => entry.id === item.productId);
+    const product = item.customBlend || item.productSnapshot || products.find((entry) => entry.id === item.productId);
     return total + (product ? product.price * item.quantity : 0);
   }, 0);
   const blendPrice = blendIds.reduce((total, id) => {
@@ -611,7 +890,7 @@ export default function App({ screen }) {
           </motion.main>
       )}
 
-      {screen === 'questionnaire' && <WelcomeQuiz onFinish={finishQuiz} />}
+      {screen === 'questionnaire' && <WelcomeQuiz onFinish={finishQuiz} products={products} productsLoading={productsLoading} productsError={productsError} />}
 
       {screen === 'accueil' && (window.localStorage.getItem(QUIZ_STORAGE_KEY)
         ? (
@@ -649,7 +928,9 @@ export default function App({ screen }) {
               <span className="image-credit">UN MOMENT POUR SOI</span>
             </section>
 
-            <MomentBanner onAddToCart={addToCart} />
+            {productsError && <p className="catalog-error" role="alert">{productsError}</p>}
+            {productsLoading && <p className="catalog-status" role="status">Chargement de l’offre…</p>}
+            {!productsLoading && momentProduct && <MomentBanner product={momentProduct} onAddToCart={addToCart} />}
 
             <section className="collection-section flavor-categories-section" id="selection">
               <div className="section-heading">
@@ -808,11 +1089,16 @@ export default function App({ screen }) {
               <h1>Bonjour, {user?.name?.split(' ')[0] || 'Camille'}.</h1>
               <p>Quel goût aura votre pause aujourd'hui&nbsp;?</p>
             </section>
-            <section className="ritual-card">
-              <img src="https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=1100&q=85" alt="Une tasse de thé préparée pour le rituel du jour" />
-              <div className="ritual-overlay" />
-              <div className="ritual-copy"><span className="eyebrow light-eyebrow">LE RITUEL DU JOUR</span><h2>Sencha<br />du matin</h2><p>Frais et délicat pour bien commencer.</p><div className="ritual-meta"><span><Clock3 size={15} /> 2 min</span><span><Coffee size={15} /> 75 °C</span></div></div>
-            </section>
+            {productsLoading ? <p className="catalog-status" role="status">Chargement du rituel…</p>
+              : senchaProduct
+                ? (
+                  <section className="ritual-card">
+                    <img src={getProductImage(senchaProduct.image)} alt={`Une tasse de ${senchaProduct.name}`} />
+                    <div className="ritual-overlay" />
+                    <div className="ritual-copy"><span className="eyebrow light-eyebrow">LE RITUEL DU JOUR</span><h2>{senchaProduct.name}</h2><p>{senchaProduct.description}</p><div className="ritual-meta"><span><Clock3 size={15} /> {senchaProduct.steep}</span><span><Coffee size={15} /> {senchaProduct.temperature}</span></div></div>
+                  </section>
+                )
+                : <p className="catalog-error" role="alert">{productsError || 'Le produit du rituel est indisponible.'}</p>}
             <section className="member-bottom">
               <div className="section-heading"><div><span className="eyebrow">À REDÉCOUVRIR</span><h2>Vos thés préférés</h2></div><Link className="text-button" to="/accueil">La collection <ArrowRight size={14} /></Link></div>
               <div className="member-tip"><Leaf size={20} /><p><strong>Le petit conseil d'BENDJO</strong><br />Réinfusez vos feuilles une seconde fois : les arômes changent, la surprise reste.</p></div>
@@ -827,14 +1113,17 @@ export default function App({ screen }) {
           <section className="page-intro">
             <span className="eyebrow">FEUILLES CHOISIES AVEC SOIN</span>
             <h1>La collection</h1>
-            <p>Huit infusions et thés, ainsi qu’un coffret pour découvrir toute la collection.</p>
+            <p>Découvrez nos infusions et thés pour trouver le goût de votre prochaine pause.</p>
           </section>
           <section className="collection-section catalog-section">
             <div className="tea-list">
-              {catalogProducts.map((product) => (
+              {products.map((product) => (
                 <ProductRow key={product.id} product={product} favorite={favorites.includes(product.id)} onToggleFavorite={toggleFavorite} onAddToCart={addToCart} />
               ))}
             </div>
+            {productsLoading && <p className="catalog-status" role="status">Chargement du catalogue…</p>}
+            {productsError && <p className="catalog-error" role="alert">{productsError}</p>}
+            {!productsLoading && !productsError && products.length === 0 && <p className="catalog-status">Aucun produit publié pour le moment.</p>}
           </section>
           <BottomNav active="accueil" cartCount={cartCount} />
         </motion.div>
@@ -905,25 +1194,30 @@ export default function App({ screen }) {
             <h1>Un rituel pour soi.</h1>
             <p>Quelques gestes simples, une tasse chaude et le temps de savourer.</p>
           </section>
+          {productsLoading ? <p className="catalog-status" role="status">Chargement du rituel…</p>
+            : senchaProduct ? (
+              <>
           <section className="ritual-card ritual-page-card">
-            <img src={img2} alt="Une tasse de thé pour une pause calme" />
+            <img src={getProductImage(senchaProduct.image)} alt={`Une tasse de ${senchaProduct.name}`} />
             <div className="ritual-overlay" />
             <div className="ritual-copy">
               <span className="eyebrow light-eyebrow">LE RITUEL DU JOUR</span>
-              <h2>Sencha<br />du matin</h2>
-              <p>Frais et délicat pour bien commencer.</p>
-              <div className="ritual-meta"><span><Clock3 size={15} /> 2 min</span><span><Coffee size={15} /> 75 °C</span></div>
+              <h2>{senchaProduct.name}</h2>
+              <p>{senchaProduct.description}</p>
+              <div className="ritual-meta"><span><Clock3 size={15} /> {senchaProduct.steep}</span><span><Coffee size={15} /> {senchaProduct.temperature}</span></div>
             </div>
           </section>
           <section className="ritual-steps">
             <h2>Votre moment en trois gestes</h2>
             <ol>
               <li><span>01</span><p><strong>Réchauffez votre tasse</strong><br />Un peu d'eau chaude pour accueillir l'infusion.</p></li>
-              <li><span>02</span><p><strong>Laissez infuser 2 minutes</strong><br />Versez une eau à 75 °C sur vos feuilles de Sencha.</p></li>
+              <li><span>02</span><p><strong>Laissez infuser {senchaProduct.steep}</strong><br />Versez une eau à {senchaProduct.temperature} sur vos feuilles de {senchaProduct.name}.</p></li>
               <li><span>03</span><p><strong>Prenez le temps</strong><br />Respirez, goûtez, et profitez de votre pause.</p></li>
             </ol>
-            <button className="primary-button ritual-cta" type="button" onClick={() => addToCart('sencha')}><ShoppingBag size={16} /> Ajouter le Sencha · {formatPrice(products.find((product) => product.id === 'sencha').price)}</button>
+            <button className="primary-button ritual-cta" type="button" onClick={() => addToCart(senchaProduct.id)}><ShoppingBag size={16} /> Ajouter le Sencha · {formatPrice(senchaProduct.price)}</button>
           </section>
+              </>
+            ) : <p className="catalog-error" role="alert">{productsError || 'Le produit du rituel est indisponible.'}</p>}
           <BottomNav active="rituel" cartCount={cartCount} />
         </motion.div>
       )}
@@ -947,11 +1241,11 @@ export default function App({ screen }) {
             <section className="cart-content">
               <div className="cart-items">
                 {cart.map((item) => {
-                  const product = item.customBlend || catalogProducts.find((entry) => entry.id === item.productId);
+                  const product = item.customBlend || item.productSnapshot || products.find((entry) => entry.id === item.productId);
                   if (!product) return null;
                   return (
                     <article className="cart-item" key={item.productId}>
-                      <div className="tea-image"><img src={product.image} alt="" /></div>
+                      <div className="tea-image"><img src={getProductImage(product.image)} alt="" /></div>
                       <div className="cart-item-details">
                         <span className="tea-type">{product.type}</span>
                         <h2>{product.name}</h2>
@@ -1003,7 +1297,7 @@ export default function App({ screen }) {
             </div>
             <p className="blend-hint">Sélectionnez une ou plusieurs feuilles pour créer votre mélange.</p>
             <div className="blend-choices">
-              {products.map((product) => {
+              {products.filter((product) => product.id !== 'moment').map((product) => {
                 const selected = blendIds.includes(product.id);
                 return (
                   <label className={`blend-choice${selected ? ' selected' : ''}`} key={product.id}>
@@ -1090,6 +1384,10 @@ export default function App({ screen }) {
           </section>
           <BottomNav active="infusion" cartCount={cartCount} />
         </motion.div>
+      )}
+
+      {screen === 'admin' && (
+        <AdminProducts token={adminToken} setToken={setAdminToken} onLogout={handleAdminLogout} refreshProducts={refreshProducts} />
       )}
     </>
   );

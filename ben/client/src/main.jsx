@@ -14,6 +14,7 @@ const router = createBrowserRouter([
       // Pages de l'application accessibles par leur chemin.
       { path: 'accueil', element: <App screen="accueil" /> },
       { path: 'auth', element: <App screen="auth" /> },
+      { path: 'admin', element: <App screen="admin" /> },
       { path: 'transition', element: <App screen="transition" /> },
       { path: 'questionnaire', element: <App screen="questionnaire" /> },
       { path: 'dashboard', element: <App screen="dashboard" /> },

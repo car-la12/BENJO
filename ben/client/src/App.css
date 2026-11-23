@@ -1677,6 +1677,150 @@
  .hero-copy h1 { font-size: 37px; }
 }
 
+.catalog-status,
+.catalog-error {
+  margin: 14px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.catalog-status { color: var(--muted); }
+.catalog-error { color: var(--cherry); }
+
+.admin-screen {
+  width: min(100%, 560px);
+  overflow-y: auto;
+  padding-bottom: 32px;
+}
+
+.admin-login {
+  padding: 42px 24px;
+}
+
+.admin-login h1,
+.admin-header h1 {
+  margin: 8px 0;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 29px;
+  font-weight: 400;
+}
+
+.admin-login > p,
+.admin-header p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 24px 20px 10px;
+}
+
+.admin-header h1 { margin-bottom: 3px; }
+.admin-header p { margin: 4px 0; }
+
+.admin-logout,
+.admin-edit-button,
+.admin-status-button,
+.admin-cancel {
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--basil);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.admin-product-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 14px 26px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+}
+
+.admin-product-form h2,
+.admin-product-list h2 {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 21px;
+  font-weight: 400;
+}
+
+.admin-product-form label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.admin-product-form input,
+.admin-product-form textarea,
+.admin-login .field-wrap input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.admin-product-form textarea { resize: vertical; }
+.admin-description-field { grid-column: 1 / -1; }
+.admin-form-actions { display: flex; flex-wrap: wrap; grid-column: 1 / -1; gap: 9px; }
+.admin-form-actions .primary-button { width: auto; min-height: 40px; padding: 9px 14px; font-size: 11px; }
+.admin-product-list { display: grid; gap: 9px; padding: 0 14px; }
+
+.admin-product-row {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.admin-product-row.is-inactive { opacity: 0.65; }
+.admin-product-row > img { width: 46px; height: 50px; border-radius: 3px; object-fit: cover; }
+.admin-product-copy { display: grid; min-width: 0; gap: 4px; }
+.admin-product-copy strong { overflow-wrap: anywhere; color: var(--ink); font-family: var(--serif); font-size: 13px; font-weight: 500; }
+.admin-product-copy span { color: var(--muted); font-size: 9px; }
+.admin-edit-button,
+.admin-status-button { min-height: 34px; padding: 6px 8px; }
+.admin-status-button { color: var(--cherry); }
+.admin-notice {
+  margin: 8px 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  color: var(--basil);
+  font-size: 11px;
+}
+
+@media (max-width: 420px) {
+  .admin-product-row { grid-template-columns: 42px minmax(0, 1fr) auto; }
+  .admin-product-row > img { width: 42px; height: 46px; }
+  .admin-status-button { grid-column: 2 / -1; justify-self: end; }
+  .admin-header { align-items: flex-start; }
+}
+
 /* Quiz de bienvenue BENDJO */
 .quiz-screen { min-height: 100vh; background: var(--ivory); color: var(--basil); padding: 24px 22px 48px; display: flex; flex-direction: column; }
 .quiz-header { display: flex; flex-direction: column; gap: 18px; align-items: flex-start; }
