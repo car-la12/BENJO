@@ -47,8 +47,8 @@ function requireAdmin(req, res, next) {
   }
 }
 
-function productResponse(row) {
-  return {
+function productResponse(row, includeAdminDetails = false) {
+  const product = {
     id: row.id,
     name: row.name,
     type: row.type,
@@ -60,6 +60,22 @@ function productResponse(row) {
     temperature: row.temperature,
     isActive: row.is_active,
   };
+
+  if (includeAdminDetails) {
+    Object.assign(product, {
+      variantName: row.variant_name,
+      sku: row.sku,
+      trackInventory: row.track_inventory,
+      stockQuantity: row.stock_quantity,
+      shippingWeightGrams: row.shipping_weight_grams,
+      packageLengthMm: row.package_length_mm,
+      packageWidthMm: row.package_width_mm,
+      packageHeightMm: row.package_height_mm,
+      fulfillmentNotes: row.fulfillment_notes,
+    });
+  }
+
+  return product;
 }
 
 async function initializeDatabase() {
@@ -69,8 +85,10 @@ async function initializeDatabase() {
   for (const product of initialProducts) {
     await pool.query(
       `INSERT INTO products
-        (id, name, type, description, price, compare_at_price, image, steep, temperature)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        (id, name, type, description, price, compare_at_price, variant_name, sku, track_inventory,
+         stock_quantity, shipping_weight_grams, package_length_mm, package_width_mm, package_height_mm,
+         fulfillment_notes, image, steep, temperature)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        ON CONFLICT (id) DO NOTHING`,
       [
         product.id,
@@ -79,12 +97,31 @@ async function initializeDatabase() {
         product.description,
         product.price,
         product.compareAtPrice ?? null,
+        product.variantName ?? 'Standard',
+        product.sku ?? null,
+        product.trackInventory ?? false,
+        product.stockQuantity ?? null,
+        product.shippingWeightGrams ?? null,
+        product.packageLengthMm ?? null,
+        product.packageWidthMm ?? null,
+        product.packageHeightMm ?? null,
+        product.fulfillmentNotes ?? '',
         product.image,
         product.steep,
         product.temperature,
       ],
     );
   }
+
+  await pool.query(
+    `UPDATE products
+     SET variant_name = 'Pack de 6 infusions + pot de miel',
+         sku = COALESCE(sku, 'BENDJO-MOMENT-6-MIEL'),
+         fulfillment_notes = CASE WHEN fulfillment_notes = '' THEN
+           'Préparer un pack de 6 infusions et inclure un pot de miel.'
+           ELSE fulfillment_notes END
+     WHERE id = 'moment' AND variant_name = 'Standard'`,
+  );
 }
 
 app.get('/api/products', async (req, res) => {
@@ -111,11 +148,13 @@ app.post('/api/admin/login', adminLoginLimiter, async (req, res) => {
 
 app.get('/api/admin/products', requireAdmin, async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, name, type, description, price, compare_at_price, image, steep, temperature, is_active
+    `SELECT id, name, type, description, price, compare_at_price, variant_name, sku, track_inventory,
+            stock_quantity, shipping_weight_grams, package_length_mm, package_width_mm,
+            package_height_mm, fulfillment_notes, image, steep, temperature, is_active
      FROM products
      ORDER BY created_at DESC, name`,
   );
-  res.json(rows.map(productResponse));
+  res.json(rows.map((row) => productResponse(row, true)));
 });
 
 app.post('/api/admin/products', requireAdmin, async (req, res) => {
@@ -127,15 +166,24 @@ app.post('/api/admin/products', requireAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query(
       `INSERT INTO products
-        (id, name, type, description, price, compare_at_price, image, steep, temperature)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, name, type, description, price, compare_at_price, image, steep, temperature, is_active`,
-      [id, product.name, product.type, product.description, product.price, product.compareAtPrice, product.image, product.steep, product.temperature],
+        (id, name, type, description, price, compare_at_price, variant_name, sku, track_inventory,
+         stock_quantity, shipping_weight_grams, package_length_mm, package_width_mm, package_height_mm,
+         fulfillment_notes, image, steep, temperature)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+       RETURNING id, name, type, description, price, compare_at_price, variant_name, sku, track_inventory,
+                 stock_quantity, shipping_weight_grams, package_length_mm, package_width_mm,
+                 package_height_mm, fulfillment_notes, image, steep, temperature, is_active`,
+      [
+        id, product.name, product.type, product.description, product.price, product.compareAtPrice,
+        product.variantName, product.sku || id.toUpperCase(), product.trackInventory, product.stockQuantity,
+        product.shippingWeightGrams, product.packageLengthMm, product.packageWidthMm, product.packageHeightMm,
+        product.fulfillmentNotes, product.image, product.steep, product.temperature,
+      ],
     );
-    res.status(201).json(productResponse(rows[0]));
+    res.status(201).json(productResponse(rows[0], true));
   } catch (error) {
     if (error.code === '23505') {
-      return res.status(409).json({ message: 'Un produit utilise déjà cet identifiant. Modifiez son nom pour le distinguer.' });
+      return res.status(409).json({ message: 'Cet identifiant ou ce SKU est déjà utilisé. Choisissez-en un autre.' });
     }
     throw error;
   }
@@ -146,16 +194,33 @@ app.put('/api/admin/products/:id', requireAdmin, async (req, res) => {
   if (validation.error) return res.status(400).json({ message: validation.error });
 
   const product = validation.data;
-  const { rows } = await pool.query(
-    `UPDATE products
-     SET name = $2, type = $3, description = $4, price = $5, compare_at_price = $6,
-         image = $7, steep = $8, temperature = $9, updated_at = NOW()
-     WHERE id = $1
-     RETURNING id, name, type, description, price, compare_at_price, image, steep, temperature, is_active`,
-    [req.params.id, product.name, product.type, product.description, product.price, product.compareAtPrice, product.image, product.steep, product.temperature],
-  );
-  if (!rows.length) return res.status(404).json({ message: 'Produit introuvable.' });
-  res.json(productResponse(rows[0]));
+  try {
+    const { rows } = await pool.query(
+      `UPDATE products
+       SET name = $2, type = $3, description = $4, price = $5, compare_at_price = $6,
+           variant_name = $7, sku = $8, track_inventory = $9, stock_quantity = $10,
+           shipping_weight_grams = $11, package_length_mm = $12, package_width_mm = $13,
+           package_height_mm = $14, fulfillment_notes = $15, image = $16,
+           steep = $17, temperature = $18, updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, name, type, description, price, compare_at_price, variant_name, sku, track_inventory,
+                 stock_quantity, shipping_weight_grams, package_length_mm, package_width_mm,
+                 package_height_mm, fulfillment_notes, image, steep, temperature, is_active`,
+      [
+        req.params.id, product.name, product.type, product.description, product.price, product.compareAtPrice,
+        product.variantName, product.sku || req.params.id.toUpperCase(), product.trackInventory, product.stockQuantity,
+        product.shippingWeightGrams, product.packageLengthMm, product.packageWidthMm, product.packageHeightMm,
+        product.fulfillmentNotes, product.image, product.steep, product.temperature,
+      ],
+    );
+    if (!rows.length) return res.status(404).json({ message: 'Produit introuvable.' });
+    res.json(productResponse(rows[0], true));
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ message: 'Cet identifiant ou ce SKU est déjà utilisé. Choisissez-en un autre.' });
+    }
+    throw error;
+  }
 });
 
 app.patch('/api/admin/products/:id/status', requireAdmin, async (req, res) => {
@@ -167,11 +232,13 @@ app.patch('/api/admin/products/:id/status', requireAdmin, async (req, res) => {
     `UPDATE products
      SET is_active = $2, updated_at = NOW()
      WHERE id = $1
-     RETURNING id, name, type, description, price, compare_at_price, image, steep, temperature, is_active`,
+     RETURNING id, name, type, description, price, compare_at_price, variant_name, sku, track_inventory,
+               stock_quantity, shipping_weight_grams, package_length_mm, package_width_mm,
+               package_height_mm, fulfillment_notes, image, steep, temperature, is_active`,
     [req.params.id, req.body.isActive],
   );
   if (!rows.length) return res.status(404).json({ message: 'Produit introuvable.' });
-  res.json(productResponse(rows[0]));
+  res.json(productResponse(rows[0], true));
 });
 
 app.use((error, req, res, next) => {

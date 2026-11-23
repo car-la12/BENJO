@@ -19,6 +19,10 @@ Lancez l’API avec `npm run dev` dans `ben/server`. Le schéma et les données 
 
 Ouvrez `/admin` sur le site, puis connectez-vous avec les paramètres CMS configurés. L’écran permet de créer et modifier les fiches (nom, type, description, prix, prix barré, image et préparation), et de les publier ou désactiver. Les images acceptées sont les quatre images intégrées au site ou une URL HTTPS.
 
+Chaque fiche comporte une déclinaison unique avec son nom et son SKU. Le suivi de stock est facultatif; lorsqu’il est désactivé, le produit est considéré comme disponible sans limite. Les champs logistiques enregistrent le poids d’expédition en grammes, les dimensions du colis en millimètres et les consignes de préparation.
+
+Le coffret « Moment » est initialisé comme « Pack de 6 infusions + pot de miel », SKU `BENDJO-MOMENT-6-MIEL`, à stock illimité. Son poids et ses dimensions restent à compléter dans `/admin` à partir des mesures réelles du colis. Le schéma applique automatiquement les nouvelles colonnes à une base existante au redémarrage du serveur.
+
 ### Client
 
 Lancez `npm run dev` dans `ben/client`. En développement, Vite transmet `/api` à `http://localhost:5000`. Pour un hébergement où le client et l’API ont des origines distinctes, définissez `VITE_API_URL` dans l’environnement de build du client avec l’origine de l’API, sans `/api` final.

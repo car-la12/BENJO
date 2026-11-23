@@ -57,6 +57,15 @@ const emptyProductForm = {
   image: productImageChoices[0],
   steep: '',
   temperature: '',
+  variantName: 'Standard',
+  sku: '',
+  trackInventory: false,
+  stockQuantity: '',
+  shippingWeightGrams: '',
+  packageLengthMm: '',
+  packageWidthMm: '',
+  packageHeightMm: '',
+  fulfillmentNotes: '',
 };
 
 const flavorCategories = [
@@ -260,6 +269,15 @@ function AdminProducts({ token, setToken, onLogout, refreshProducts }) {
       image: product.image,
       steep: product.steep || '',
       temperature: product.temperature || '',
+      variantName: product.variantName || 'Standard',
+      sku: product.sku || '',
+      trackInventory: product.trackInventory,
+      stockQuantity: product.stockQuantity == null ? '' : String(product.stockQuantity),
+      shippingWeightGrams: product.shippingWeightGrams == null ? '' : String(product.shippingWeightGrams),
+      packageLengthMm: product.packageLengthMm == null ? '' : String(product.packageLengthMm),
+      packageWidthMm: product.packageWidthMm == null ? '' : String(product.packageWidthMm),
+      packageHeightMm: product.packageHeightMm == null ? '' : String(product.packageHeightMm),
+      fulfillmentNotes: product.fulfillmentNotes || '',
     });
     setNotice('');
     setError('');
@@ -358,6 +376,22 @@ function AdminProducts({ token, setToken, onLogout, refreshProducts }) {
         <label><span>Image (nom local ou URL HTTPS)</span><input list="product-image-options" value={form.image} onChange={(event) => setForm({ ...form, image: event.target.value })} required /><datalist id="product-image-options">{productImageChoices.map((image) => <option value={image} key={image} />)}</datalist></label>
         <label><span>Temps d’infusion</span><input value={form.steep} maxLength={40} onChange={(event) => setForm({ ...form, steep: event.target.value })} /></label>
         <label><span>Température</span><input value={form.temperature} maxLength={30} onChange={(event) => setForm({ ...form, temperature: event.target.value })} /></label>
+        <h3 className="admin-form-section">Déclinaison et stock</h3>
+        <label><span>Déclinaison (unique)</span><input value={form.variantName} maxLength={120} onChange={(event) => setForm({ ...form, variantName: event.target.value })} required /></label>
+        <label><span>SKU (référence interne)</span><input value={form.sku} maxLength={80} onChange={(event) => setForm({ ...form, sku: event.target.value.toUpperCase() })} placeholder="Ex. BENDJO-MOMENT-6-MIEL" /></label>
+        <label className="admin-checkbox-field">
+          <input type="checkbox" checked={form.trackInventory} onChange={(event) => setForm({ ...form, trackInventory: event.target.checked, stockQuantity: event.target.checked ? form.stockQuantity : '' })} />
+          <span>Suivre le stock (désactivé : stock illimité)</span>
+        </label>
+        {form.trackInventory && (
+          <label><span>Quantité en stock</span><input type="number" min="0" step="1" value={form.stockQuantity} onChange={(event) => setForm({ ...form, stockQuantity: event.target.value })} required /></label>
+        )}
+        <h3 className="admin-form-section">Logistique du colis</h3>
+        <label><span>Poids d’expédition (g)</span><input type="number" min="1" step="1" value={form.shippingWeightGrams} onChange={(event) => setForm({ ...form, shippingWeightGrams: event.target.value })} /></label>
+        <label><span>Longueur du colis (mm)</span><input type="number" min="1" step="1" value={form.packageLengthMm} onChange={(event) => setForm({ ...form, packageLengthMm: event.target.value })} /></label>
+        <label><span>Largeur du colis (mm)</span><input type="number" min="1" step="1" value={form.packageWidthMm} onChange={(event) => setForm({ ...form, packageWidthMm: event.target.value })} /></label>
+        <label><span>Hauteur du colis (mm)</span><input type="number" min="1" step="1" value={form.packageHeightMm} onChange={(event) => setForm({ ...form, packageHeightMm: event.target.value })} /></label>
+        <label className="admin-description-field"><span>Consignes de préparation</span><textarea value={form.fulfillmentNotes} maxLength={1000} rows={2} onChange={(event) => setForm({ ...form, fulfillmentNotes: event.target.value })} /></label>
         <div className="admin-form-actions">
           <button type="submit" className="primary-button" disabled={saving}>{saving ? 'Enregistrement…' : editingProduct ? 'Enregistrer' : 'Créer le produit'}</button>
           {editingProduct && <button type="button" className="admin-cancel" onClick={resetForm}>Annuler</button>}
@@ -371,7 +405,7 @@ function AdminProducts({ token, setToken, onLogout, refreshProducts }) {
             <img src={getProductImage(product.image)} alt="" />
             <div className="admin-product-copy">
               <strong>{product.name}</strong>
-              <span>{formatPrice(product.price)} · {product.isActive ? 'Publié' : 'Désactivé'}</span>
+              <span>{formatPrice(product.price)} · {product.sku || 'Sans SKU'} · {product.trackInventory ? `${product.stockQuantity} en stock` : 'Stock illimité'} · {product.isActive ? 'Publié' : 'Désactivé'}</span>
             </div>
             <button type="button" className="admin-edit-button" onClick={() => startEditing(product)}>Modifier</button>
             <button type="button" className="admin-status-button" onClick={() => toggleProductStatus(product)}>{product.isActive ? 'Désactiver' : 'Publier'}</button>
